@@ -1,1 +1,1 @@
-worker: python index.py
+web: npm run start:prod
