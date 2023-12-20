@@ -1,6 +1,6 @@
 anyio
-async-generator
 asyncio
+async-generator
 beautifulsoup4
 bs4
 certifi
