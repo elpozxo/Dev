@@ -1,6 +1,7 @@
 {
   "scripts": {
     "start": "nodemon --exec python index.py",
-    "start:prod": "python index.py"
+    "start:prod": "python index.py",
+    "inss": "pip install -r requirements.txt"
   }
 }
