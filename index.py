@@ -1,5 +1,6 @@
 from flask import Flask, request, abort
 from telebot import TeleBot, types, util
+from telegram import KeyboardButton, ReplyKeyboardMarkup
 import config,re,logging, threading,requests
 from datetime import datetime
 from modelo.user import Principal, Usuario
@@ -15,6 +16,9 @@ main_bot = TeleBot(config.MAIN_BOT_TOKEN)
 tokens = {config.MAIN_BOT_TOKEN: True}
 lista_hashid_input=[]
 lista_hash_input=[]
+lista_grupo_input=[]
+lista_disponible_input=[]
+lista_addnumero_input=[]
 # Configura el sistema de registros
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -160,20 +164,91 @@ def handle_btf_apihash_nuevo(call):
         id_user = int(call.data.split(":")[1])
         # Llamar a la función con el id_user
         DO_Agregar_Api(id_user)
-    except Exception  :
-        print(f"Error al manejar la acción del botón flotante:  ")
+    except Exception  as x :
+        print(f"Error al manejar la acción del botón flotante[DO_Agregar_Api]:  {x}")
 
 def DO_Agregar_Api(id_user):
-    main_bot.send_message(id_user, ma_envia_hash_id(), parse_mode="Markdown") 
-    lista_hashid_input.append(id_user)
+    main_bot.send_message(id_user, ma_envia_hash(), parse_mode="Markdown") 
+    lista_hash_input.append(id_user)
+
+# Manejar la acción del botón flotante
+@main_bot.callback_query_handler(func=lambda call: 'DO_Agregar_grupo' in call.data)
+def handle_btf_DO_Agregar_grupo(call):
+    try:
+        main_bot.delete_message(call.message.chat.id, call.message.message_id)
+        # Obtener el id_user del callback_data
+        id_user = int(call.data.split(":")[1])
+        # Llamar a la función con el id_user
+        DO_Agregar_grupo(id_user)
+    except Exception  as x :
+        print(f"Error al manejar la acción del botón flotante[DO_Agregar_grupo]:  {x}")
+
+def DO_Agregar_grupo(id_user):
+    main_bot.send_message(id_user, ma_envia_grupo(), parse_mode="Markdown") 
+    lista_grupo_input.append(id_user)
+
+# Manejar la acción del botón flotante
+@main_bot.callback_query_handler(func=lambda call: 'DO_disponible' in call.data)
+def handle_btf_DO_disponible(call):
+    try:        
+        id_user = int(call.data.split(":")[1])
+        main_bot.delete_message(id_user, call.message.message_id)
+        # Obtener el id_user del callback_data
+        # Llamar a la función con el id_user
+        p = Principal()
+        p=cargarPrincipal(obtener_informacion("Principal", id_user)) 
+        if p.disponible=="" or not p.disponible:
+            p.disponible=True
+        else:
+            p.disponible=False 
+        guardar_informacion("Principal",id_user,p)  
+        AgregarAcc(id_user)
+        logger.info(f"User {id_user} envió [disponible]  "+horatodo()) 
+    except Exception  as x :
+        print(f"Error al manejar la acción del botón flotante[DO_disponible]:  {x}")
+
+@main_bot.callback_query_handler(func=lambda call: 'DO_Agregar_Numero' in call.data)
+def handle_btf_DO_Agregar_Numero(call):
+    try:        
+        id_user = int(call.data.split(":")[1])
+        main_bot.delete_message(id_user, call.message.message_id)         
+        mensaje_para_borrar=main_bot.send_message(id_user, "_Validando Api_",reply_markup=
+        crear_linea_fboton("::[Espere por favor]"),parse_mode="Markdown")
+        main_bot.delete_message(id_user, mensaje_para_borrar.message_id)         
+        mensaje_para_borrar=main_bot.send_message(id_user, "Ejemplo de numero Celular +573001112233\nDonde +57 es el *indicativo* del pais\n*Envie el Numero*",reply_markup=
+        crear_linea_fboton("Envie numero celular"),parse_mode="Markdown")
+        lista_addnumero_input.append(id_user)
+
+        logger.info(f"User {id_user} envió [DO_Agregar_Numero]  "+horatodo()) 
+    except Exception  as x :
+        print(f"Error al manejar la acción del botón flotante[DO_Agregar_Numero]:  {x}")
+
 
 def btf_apihash_nuevo(id_user):  
     keyboard = types.InlineKeyboardMarkup() 
     fila = [
         types.InlineKeyboardButton(text="Agregar Api_Id" , callback_data=f'DO_Agregar_Api_id:{id_user}'),
         types.InlineKeyboardButton(text="Agregar Api_Hash" , callback_data=f'DO_Agregar_Api:{id_user}') ] 
-    keyboard.add(*fila)     
+    keyboard.add(*fila) 
+    return keyboard
 
+def btf_apihash(id_user):  
+    keyboard = types.InlineKeyboardMarkup() 
+    fila = [
+        types.InlineKeyboardButton(text="Agregar Api_Id" , callback_data=f'DO_Agregar_Api_id:{id_user}'),
+        types.InlineKeyboardButton(text="Agregar Api_Hash" , callback_data=f'DO_Agregar_Api:{id_user}') 
+        ] 
+    
+    fila1 = [
+        types.InlineKeyboardButton(text="Agregar Tu Grupo" , callback_data=f'DO_Agregar_grupo:{id_user}'),
+        types.InlineKeyboardButton(text="Disponible" , callback_data=f'DO_disponible:{id_user}') 
+        ] 
+    fila2=[
+         types.InlineKeyboardButton(text="Agregar Numero" , callback_data=f'DO_Agregar_Numero:{id_user}') 
+    ]
+    keyboard.add(*fila)     
+    keyboard.add(*fila1)     
+    keyboard.add(*fila2)     
     return keyboard
 
 
@@ -270,37 +345,87 @@ def handle_Info(message: types.Message):
     main_bot.send_message(message.chat.id, ma_texto_de_apuesta(monto_user_id), reply_markup=btf_texto_dado())
     logger.info(f"User {message.from_user.id} envió /casino "+horatodo())
 
-def AgregarAcc(message):
+def AgregarAcc(id_user):
     mensaje=0
-    hash_id=bd_obtener_hash_id(message.chat.id)
-    hash=bd_obtener_hash(message.chat.id)
-    if(hash_id in [-1,0] or True):  
-        mensaje=main_bot.send_message(message.chat.id, ma_falta_hash(),parse_mode='Markdown',reply_markup=btf_apihash_nuevo(message.chat.id))
-    else: 
-        mensaje=main_bot.send_message(message.chat.id, ma_no_falta_hash(hash_id,hash),parse_mode='Markdown',reply_markup=crear_linea_fboton(["Agregar API_ID;Agregar API_HASH","Agregar Numero"]))
+    hash_id=bd_obtener_hash_id(id_user)
+    hash=bd_obtener_hash(id_user)
+    if(hash_id in [-1,0]):  
+        mensaje=main_bot.send_message(id_user, ma_falta_hash(),parse_mode='Markdown',reply_markup=btf_apihash_nuevo(id_user))
+    else:         
+        p = Principal()
+        p=cargarPrincipal(obtener_informacion("Principal", id_user))
+        mensaje=main_bot.send_message(
+            id_user, 
+            ma_no_falta_hash(p.api_id,p.api_hash,p.grupo,p.disponible),
+            parse_mode='Markdown',
+            reply_markup=btf_apihash(id_user)
+        )
     minutos=5
     threading.Timer(minutos*60, cerrar_alerta_auto, args=[mensaje.chat.id,mensaje]).start()
 
 @main_bot.message_handler(func=lambda message: message.text in ['/'+ma_botones("add_cuenta"),ma_botones("add_cuenta")])
 def handle_AgregarAcc(message: types.Message):   
-    AgregarAcc(message)
+    AgregarAcc(message.chat.id)
+
+def cargarPrincipal(consulta):
+    p = Principal()
+    if consulta:
+        # Crea una instancia de la clase Principal con los consulta obtenidos
+        p = Principal(
+            grupo=consulta.get("grupo"),
+            id_user=consulta.get("id_user"),
+            api_id=consulta.get("api_id"),
+            api_hash=consulta.get("api_hash"),
+            disponible=consulta.get("disponible")
+        )
+    return p
+
 
 ##Comando defaul
 @main_bot.message_handler(func=lambda message: True)
-def handle_default(message: types.Message):    
-    p=Principal()
+def handle_default(message: types.Message):     
+
     if message.from_user.id in lista_hashid_input:
         if message.text.isdigit(): 
+            p = Principal()
+            p=cargarPrincipal(obtener_informacion("Principal",message.chat.id))
             p.api_id=message.text
             p.id_user=message.from_user.id
             guardar_informacion("Principal",message.from_user.id,p)  
-            AgregarAcc(message)
-            logger.info(f"User {message.from_user.id} envió [no] {message.text}"+horatodo())
-    elif message.from_user.id in lista_hash_input:
-        f=2
+            AgregarAcc(message.chat.id)
+            logger.info(f"User {message.from_user.id} envió [hash_id] {message.text}"+horatodo())
+            lista_hashid_input.remove(p.id_user)
+    elif message.from_user.id in lista_hash_input:              
+        p = Principal()
+        p=cargarPrincipal(obtener_informacion("Principal", message.from_user.id))  
+        p.api_hash=message.text
+        p.id_user=message.from_user.id
+        guardar_informacion("Principal",message.from_user.id,p)  
+        AgregarAcc(message.chat.id)
+        logger.info(f"User {message.from_user.id} envió [api_hash] {message.text}"+horatodo())
+        lista_hash_input.remove(p.id_user)
+    elif message.from_user.id in lista_grupo_input:              
+        p = Principal()
+        p=cargarPrincipal(obtener_informacion("Principal", message.from_user.id))  
+        p.grupo=message.text
+        p.id_user=message.from_user.id
+        guardar_informacion("Principal",message.from_user.id,p)  
+        AgregarAcc(message.chat.id)
+        logger.info(f"User {message.from_user.id} envió [grupo] {message.text}"+horatodo())
+        lista_grupo_input.remove(p.id_user)     
+    elif message.from_user.id in lista_addnumero_input:              
+        p = Principal()
+        p=cargarPrincipal(obtener_informacion("Principal", message.from_user.id))  
+        p.grupo=message.text
+        p.id_user=message.from_user.id
+        guardar_informacion("Principal",message.from_user.id,p)  
+        AgregarAcc(message.chat.id)
+        logger.info(f"User {message.from_user.id} envió [grupo] {message.text}"+horatodo())
+        lista_grupo_input.remove(p.id_user)     
     else:
         main_bot.send_message(message.chat.id, "Lo siento, no entiendo ese comando.")
         logger.info(f"User {message.from_user.id} envió [no] {message.text}"+horatodo())
+
 
 
 if __name__ == '__main__':
