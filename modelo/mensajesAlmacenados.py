@@ -45,16 +45,33 @@ Una vez registrado, [registra tu hash](https://my.telegram.org/apps)
 copiando el "*App api_id*" & "*App api_hash*" para agregarlo aquí.
 """
 
-def ma_no_falta_hash(api_id,api_has):
-    return f"""La información almacenada de tu [Api Telegram](https://my.telegram.org/auth) 
+def ma_no_falta_hash(api_id,api_has,grupo,disponible):
+    if disponible=="" or not disponible:
+        disponible="No"
+    else:
+        disponible="Si"
+    if grupo=="":
+        grupo="Chat individuales"
+    return f"""La información almacenada de tu 
+<a href="https://my.telegram.org/auth">Api Telegram</a>
 
-*App api_id*={api_id}
-*App api_hash*={api_has}
+<b>App api_id</b>: {api_id}
+<b>App api_hash</b>: {api_has}
+<b>Grupo Principal</b>: {grupo}
+<b>Disponibilidad para tarea</b>: {disponible}
 """
 
 def ma_envia_hash_id():
     return """El *Api_Id* es un numero 
 *Ingreselo ahora*:"""
+
+def ma_envia_hash():
+    return """El *Api_Hash* Ingreselo ahora:"""
+
+def ma_envia_grupo():
+    return """El *Grupo* debe ser publico, y las cuenta no debe estar BAN por escritura, o con permiso especial para poder escribir en el grupo. 
+    Recuerda solo poner el @grupo y que este sea publico
+    Ingreselo ahora:"""
 
 def ma_botones(cual):
     if(cual=="Info"):
@@ -63,4 +80,6 @@ def ma_botones(cual):
         return "Casino"
     if(cual=="add_cuenta"):
         return "Agregar Cuenta"
+    if(cual=="lista_cuanta"):
+        return "Listar Cuenta"
     return "._."

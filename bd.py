@@ -55,7 +55,7 @@ def bd_contar_disponibles(id_users_principales):
     # Contar en la tabla cuenta cuántos id_user coinciden con la lista obtenida
     if(len(id_users_principales)==0):
         return  0
-    cuenta_query = firestore.client().collection('Cuenta').where('id_user', 'in', id_users_principales)    
+    cuenta_query = firestore.client().collection('Cuentas').where('id_usuario', 'in', id_users_principales).where('activo','==',True)   
     # Obtener los documentos y contar la cantidad
     cuenta_resultados = cuenta_query.get()
     cantidad_disponibles = len(cuenta_resultados)
@@ -106,4 +106,22 @@ def bd_obtener_hash(usuario_id):
     else:
         return -1  # El usuario no existe
     
+def obtener_cuentas_paginadas(id_usuario, n=5, l=0):
+    db = firestore.client().collection('Cuentas')
+    # Realizar la consulta
+    cuenta_query = db \
+        .where('id_usuario', '==', id_usuario)  
+    # Obtener los documentos
+    cuentas = cuenta_query.stream()
+    # Crear una lista de resultados
+    resultados = []
+    if cuentas:
+        cuentas = list(cuentas)  # Convertir a lista para poder indexar
+        inicio = l * n
+        fin = inicio + n
+        cuentas_pagina = cuentas[inicio:fin]
+        for cuenta in cuentas_pagina:
+            datos_cuenta = cuenta.to_dict()
+            resultados.append(datos_cuenta)
+    return resultados,len(cuentas)
  
