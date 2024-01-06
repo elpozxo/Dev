@@ -52,12 +52,13 @@ def ma_no_falta_hash(api_id,api_has,grupo,disponible):
         disponible="Si"
     if grupo=="":
         grupo="Chat individuales"
-    return f"""La información almacenada de tu \n[Api Telegram](https://my.telegram.org/auth) 
+    return f"""La información almacenada de tu 
+<a href="https://my.telegram.org/auth">Api Telegram</a>
 
-*App api_id*={api_id}
-*App api_hash*={api_has}
-*Grupo Principal*={grupo}
-*Disponibilidad para tarea*={disponible}
+<b>App api_id</b>: {api_id}
+<b>App api_hash</b>: {api_has}
+<b>Grupo Principal</b>: {grupo}
+<b>Disponibilidad para tarea</b>: {disponible}
 """
 
 def ma_envia_hash_id():
@@ -68,7 +69,9 @@ def ma_envia_hash():
     return """El *Api_Hash* Ingreselo ahora:"""
 
 def ma_envia_grupo():
-    return """El *Grupo* debe ser publico, y las cuenta no debe estar BAN por escritura, o con permiso especial para poder escribir en el grupo. Ingreselo ahora:"""
+    return """El *Grupo* debe ser publico, y las cuenta no debe estar BAN por escritura, o con permiso especial para poder escribir en el grupo. 
+    Recuerda solo poner el @grupo y que este sea publico
+    Ingreselo ahora:"""
 
 def ma_botones(cual):
     if(cual=="Info"):
@@ -77,4 +80,6 @@ def ma_botones(cual):
         return "Casino"
     if(cual=="add_cuenta"):
         return "Agregar Cuenta"
+    if(cual=="lista_cuanta"):
+        return "Listar Cuenta"
     return "._."

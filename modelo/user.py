@@ -27,16 +27,17 @@ class Principal:
         return f"Grupo: {self.grupo}, ID User: {self.id_user}, API ID: {self.api_id}, API Hash: {self.api_hash}, Disponible: {self.disponible}"
 
 class Cuenta:
-    def __init__(self, id_usuario, numero,activo,ultimo,fecha,ban):
+    def __init__(self=None, id_usuario=None, numero=None,activo=None,ultimo=None,fecha=None,ban=None,elid=None):
         self.id_usuario = id_usuario
         self.numero = numero
         self.activo = activo
         self.ultimo = ultimo
         self.fecha = fecha
         self.ban = ban
+        self.elid =elid
 
     def __str__(self):
-        return f'Cuenta(ID Usuario: {self.id_usuario}, Saldo: {self.saldo})'
+        return f'Cuenta(ID Usuario: {self.id_usuario}, Saldo: {self.ban}, #: {self.numero})'
 
 
 def validate(texto):

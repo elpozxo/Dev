@@ -1,11 +1,12 @@
+import config,re,logging, threading,requests,asyncio
 from flask import Flask, request, abort
 from telebot import TeleBot, types, util
 from telegram import KeyboardButton, ReplyKeyboardMarkup
-import config,re,logging, threading,requests
 from datetime import datetime
-from modelo.user import Principal, Usuario
+from modelo.user import Cuenta, Principal, Usuario
 from modelo.mensajesAlmacenados import *
-from bd import bd_contar_disponibles, bd_obtener_hash, bd_obtener_hash_id, bd_obtener_id_users_principales, bd_obtener_saldo_total, inicializar_firebase, guardar_informacion, obtener_ids, obtener_informacion, saber_admin
+from codigo import Inicializar, Logear_a, Logear_ab, validarcuenta
+from bd import *
 # Inicializar Firebase
 inicializar_firebase()
 
@@ -18,7 +19,9 @@ lista_hashid_input=[]
 lista_hash_input=[]
 lista_grupo_input=[]
 lista_disponible_input=[]
-lista_addnumero_input=[]
+lista_addnumero_input=[] 
+lista_addnumerocodigo_input=[] 
+lista_addnumerocodigo_input2=[] 
 # Configura el sistema de registros
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -31,6 +34,28 @@ def get_fecha():
     return str(current_time)
 def horatodo():
     return get_fecha()+" "+get_hora()
+
+def aplicar_estilo(texto, estilo):
+    # Define tus estilos aquí
+
+    # - Negrita: <b>texto en negrita</b>, <strong>negrita</strong>
+    # - Cursiva: <i>texto en cursiva</i>, <em>cursiva</em>
+    # - Subrayado: <u>texto subrayado</u>, <ins>subrayado</ins>
+    # - Tachado: <s>texto tachado</s>, <strike>tachado</strike>, <del>tachado</del> 
+    # <a href="tg://user?id=123456789">inline mention of a user</a>
+    # - Código: <code>texto con el código</code>
+    # - Indica a la API que debe respetar los saltos de línea y los espacios en blanco: <pre>Texto con saltos de línea y espacios</pre>
+    
+
+    # Aplica el estilo si está definido
+    if estilo == 't':
+        return f"<i><b>{texto}</b></i>"
+    elif estilo == 'c':
+        return f"<code>{texto}</code>"
+    elif estilo == 'ta':
+        return f"<pre>{texto}</pre>"
+    else:
+        return texto
 
 def es_admin(id):
     try:
@@ -81,7 +106,7 @@ def enviar_mensaje(lista_ids, mensaje):
             # Manejar otras excepciones no previstas
             print(f"Error desconocido al enviar mensaje a usuario {usuario_id} ")
     
-def enviar_alerta(usuario_id, mensaje):
+def enviar_alerta(usuario_id, mensaje,parse_mode="NO",minutos=3):
     # Crear un mensaje con teclado en línea vacío
     markup = types.InlineKeyboardMarkup()
     
@@ -90,10 +115,12 @@ def enviar_alerta(usuario_id, mensaje):
     markup.add(btn_cerrar)
 
     # Enviar el mensaje con el teclado en línea
-    mensaje_enviado = main_bot.send_message(usuario_id, mensaje, reply_markup=markup)
-
+    if parse_mode=="NO":
+        mensaje_enviado = main_bot.send_message(usuario_id, mensaje, reply_markup=markup)
+    else:
+        mensaje_enviado = main_bot.send_message(usuario_id, mensaje, reply_markup=markup,parse_mode=parse_mode)
     # Configurar el temporizador para cerrar el mensaje después de 3 minutos
-    minutos=3
+    
     threading.Timer(minutos*60, cerrar_alerta_auto, args=[mensaje_enviado.chat.id, mensaje_enviado.message_id]).start()
 
 # Función para cerrar automáticamente el mensaje
@@ -102,6 +129,15 @@ def cerrar_alerta_auto(chat_id, message_id):
         main_bot.delete_message(chat_id, message_id)
     except:
         f=1
+def borrarultimosmenaje( message_id,chat_id,c):
+    for i in range(1,1+c):
+        try:
+            main_bot.delete_message(chat_id, message_id-i)
+        except:
+            f=1
+
+def borrar_mensaje_en( minutos=3,id_user=0,mensaje=0):   
+    threading.Timer(minutos*60, cerrar_alerta_auto, args=[id_user,mensaje]).start()
 
 # Manejar la acción de cerrar alerta
 @main_bot.callback_query_handler(func=lambda call: call.data == 'cerrar_alerta')
@@ -215,9 +251,13 @@ def handle_btf_DO_Agregar_Numero(call):
         mensaje_para_borrar=main_bot.send_message(id_user, "_Validando Api_",reply_markup=
         crear_linea_fboton("::[Espere por favor]"),parse_mode="Markdown")
         main_bot.delete_message(id_user, mensaje_para_borrar.message_id)         
-        mensaje_para_borrar=main_bot.send_message(id_user, "Ejemplo de numero Celular +573001112233\nDonde +57 es el *indicativo* del pais\n*Envie el Numero*",reply_markup=
-        crear_linea_fboton("Envie numero celular"),parse_mode="Markdown")
+        mensaje_para_borrar=main_bot.send_message(id_user, 
+            "Ejemplo de numero Celular +573001112233\nDonde +57 es el *indicativo* del pais\n*Envie el Numero*",
+            reply_markup= crear_linea_fboton("Envie numero celular"),parse_mode="Markdown")
         lista_addnumero_input.append(id_user)
+        minutos=3
+        threading.Timer(minutos*60, cerrar_alerta_auto, args=[id_user,mensaje_para_borrar]).start()
+
 
         logger.info(f"User {id_user} envió [DO_Agregar_Numero]  "+horatodo()) 
     except Exception  as x :
@@ -292,9 +332,9 @@ def handle_start(message: types.Message):
     if not obtener_informacion("Usuarios",user_info.id): 
         if(message.from_user.id!=user_id_referente ):
             us.ref_id=user_id_referente 
-            main_bot.send_message(user_id_referente, f"Invitaste a @{user_info.username}")  
-            ##BONO?
-        enlace_perfil = f"tg://openmessage?user_id={user_id_referente}"
+            enviar_mensaje([user_id_referente], f"Invitaste a @{user_info.username}")  
+            ##BONO? 
+        enlace_perfil = f"tg://user?id={user_id_referente}"
         mensaje = f"¡Hola! \nInvitado por [{user_id_referente}]({enlace_perfil})."
         main_bot.send_message(message.chat.id, mensaje, parse_mode="Markdown") 
         logger.info(f"User {message.from_user.id} envió /hola "+user_id_referente+horatodo())        
@@ -347,17 +387,16 @@ def handle_Info(message: types.Message):
 
 def AgregarAcc(id_user):
     mensaje=0
-    hash_id=bd_obtener_hash_id(id_user)
-    hash=bd_obtener_hash(id_user)
+    hash_id=bd_obtener_hash_id(id_user) 
     if(hash_id in [-1,0]):  
         mensaje=main_bot.send_message(id_user, ma_falta_hash(),parse_mode='Markdown',reply_markup=btf_apihash_nuevo(id_user))
     else:         
         p = Principal()
         p=cargarPrincipal(obtener_informacion("Principal", id_user))
         mensaje=main_bot.send_message(
-            id_user, 
+            id_user,  
             ma_no_falta_hash(p.api_id,p.api_hash,p.grupo,p.disponible),
-            parse_mode='Markdown',
+            parse_mode='HTML',
             reply_markup=btf_apihash(id_user)
         )
     minutos=5
@@ -380,11 +419,184 @@ def cargarPrincipal(consulta):
         )
     return p
 
+def agrego_new_numero(nemeri_texto,id_user):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    x=0
+    try:
+        mensaje_para_borrar=main_bot.send_message(id_user, "_Validando Numero_",reply_markup=
+        crear_linea_fboton(nemeri_texto),parse_mode="Markdown")
+        p = Principal()
+        p=cargarPrincipal(obtener_informacion("Principal",id_user))  
+        Inicializar(p.api_id,p.api_hash) 
+        x = loop.run_until_complete(Logear_a(nemeri_texto)) 
 
+        cerrar_alerta_auto(id_user,mensaje_para_borrar)
+        if(x==-1):
+            main_bot.send_message(id_user, "No se pudo Validar el numero",reply_markup=
+                crear_linea_fboton(nemeri_texto),parse_mode="Markdown") 
+        if(x==0):
+            x=Cuenta(id_user,nemeri_texto) 
+            lista_addnumerocodigo_input.append(x)
+            lista_addnumerocodigo_input2.append(id_user)
+            main_bot.send_message(id_user, "Se envio un Codigo a: ",reply_markup=
+                crear_linea_fboton(nemeri_texto),parse_mode="Markdown") 
+        if(x==1):
+            mens=main_bot.send_message(id_user, "Numero Ok.",reply_markup=
+                crear_linea_fboton(nemeri_texto),parse_mode="Markdown") 
+            borrarultimosmenaje( mens.message_id,id_user,3)
+    except Exception as inst:
+        print(inst)
+        x=-2    
+
+def agrego_new_numero2(cod_texto,nemeri_texto,id_user):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    x=0
+    try:
+        mensaje_para_borrar=main_bot.send_message(id_user, "_Validando Codigo_",reply_markup=
+        crear_linea_fboton(nemeri_texto),parse_mode="Markdown")
+        p = Principal()
+        p=cargarPrincipal(obtener_informacion("Principal",id_user))  
+        Inicializar(p.api_id,p.api_hash) 
+        x = loop.run_until_complete(Logear_ab(nemeri_texto,cod_texto)) 
+        cerrar_alerta_auto(id_user,mensaje_para_borrar)
+        if(x==-1):
+            main_bot.send_message(id_user, "No se pudo Validar el numero",reply_markup=
+                crear_linea_fboton(nemeri_texto),parse_mode="Markdown") 
+        if(x==0): 
+            mens=main_bot.send_message(id_user, "Numero Ok.",reply_markup=
+                crear_linea_fboton(nemeri_texto),parse_mode="Markdown") 
+            borrarultimosmenaje( mens.message_id,id_user,5)
+        if(x==1):
+            mens=main_bot.send_message(id_user, "Numero Ok",reply_markup=
+                crear_linea_fboton(nemeri_texto),parse_mode="Markdown")            
+            borrarultimosmenaje( mens.message_id,id_user,3)
+    except Exception as inst:
+        print(inst)
+        x=-2  
+
+def DO_ListarCuenta_validarAll(id_user):
+    f=1
+def listarCuentaBotoflotante():
+    f=1
+ 
+@main_bot.callback_query_handler(func=lambda call: 'DO_ActivarNumero' in call.data)
+def handle_btf_DO_ActivarNumero(call):    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    datos_callback = call.data.split(':') 
+    datos_tupla = eval(datos_callback[1])
+    numero, id_user = datos_tupla 
+    mensaje= main_bot.send_message(id_user, f"Buscando la informacion de [{numero}]")
+    cuenta=Cuenta()
+    cuenta=obtener_informacion("Cuentas",f"{id_user}{numero}")
+    p = Principal()
+    p=cargarPrincipal(obtener_informacion("Principal",id_user))  
+    cerrar_alerta_auto(id_user,mensaje.message_id)
+    enviar_alerta(id_user, f"Validando Tu Api Tg [{p.api_id}]:[{aplicar_estilo('**'+p.api_hash[2:-3]+'***','ta')}]","HTML",5)
+    Inicializar(p.api_id,p.api_hash)
+    try:
+        x,y = loop.run_until_complete(validarcuenta(numero,[p.grupo,"BotColombia"]))
+        print(x,y)
+    except Exception as cx:
+        print("erroe\n",cx,"f\n")
+    print("ya")
+    
+
+@main_bot.callback_query_handler(func=lambda call: 'DO_ln_VerNumero' in call.data)
+def handle_btf_DO_ln_VerNumero(call):
+    datos_callback = call.data.split(':') 
+    datos_tupla = eval(datos_callback[1])
+    numero, id_user = datos_tupla 
+    mensaje= main_bot.send_message(id_user, f"Buscando la informacion de [{numero}]")
+    cuenta=Cuenta()
+    cuenta=obtener_informacion("Cuentas",f"{id_user}{numero}")
+    cerrar_alerta_auto(id_user,mensaje.message_id)
+    id=""
+    try:
+        if cuenta.get('elid'):
+            id=f"{aplicar_estilo('ID:', 't')} <a href='tg://user?id={cuenta.get('elid')}'>{cuenta.get('elid')}</a> \n" 
+        else:
+            id= f"{aplicar_estilo('ID:', 't')} NO \n" 
+    except:
+        id= f"{aplicar_estilo('ID:', 't')} NO \n" 
+    mensaje = f"Información de la cuenta:\n\n" \
+          f"{aplicar_estilo('Número:', 't')} {aplicar_estilo(numero, 'c')}\n" \
+          f"{aplicar_estilo('Fecha registro:', 't')} {aplicar_estilo(cuenta.get('fecha'), '')}\n" \
+          f"{aplicar_estilo('ultimo log:', 't')} {aplicar_estilo(cuenta.get('ultimo'), '')}\n"\
+          f"{aplicar_estilo('Estado:', 't')} {aplicar_estilo(cuenta.get('activo'), '')}\n{id}" 
+          
+    enviar_alerta(id_user,mensaje,parse_mode="HTML")
+
+
+
+def ListarCuenta(cuantas,index,id_user):     
+    l_numeros,cuantes_cuentas=obtener_cuentas_paginadas(id_user,cuantas,index) 
+    keyboard = types.InlineKeyboardMarkup() 
+    mensaje=0    
+    f= [
+        types.InlineKeyboardButton(text="Regresar" , callback_data=f'DO_:{id_user}'),
+        types.InlineKeyboardButton(text=f"{(index)+1} de {round(cuantes_cuentas/cuantas)}" , callback_data=f'DO_:{id_user}') ,
+         ]          
+    i= [        
+        types.InlineKeyboardButton(text=f"{(index)+1} de {round(cuantes_cuentas/cuantas)}" , callback_data=f'DO_:{id_user}') ,
+        types.InlineKeyboardButton(text="Sigiente" , callback_data=f'DO_:{id_user}')
+        ]           
+    m= [                
+        types.InlineKeyboardButton(text="Regresar" , callback_data=f'DO_:{id_user}'),
+        types.InlineKeyboardButton(text=f"{(index)+1} de {round(cuantes_cuentas/cuantas)}" , callback_data=f'DO_:{id_user}') ,
+        types.InlineKeyboardButton(text="Sigiente" , callback_data=f'DO_:{id_user}')
+        ]                 
+    if(cuantes_cuentas==0 ):
+        if index!=0:            
+            keyboard.add(*f)
+        else:
+            enviar_mensaje([id_user],"Sin Numero Regitrados") 
+    else:
+        ff= [
+                types.InlineKeyboardButton(text="    Numeros    ", callback_data=f'DO_ListarCuenta_validarAll:{id_user}' ),
+                types.InlineKeyboardButton(text="Estado" , callback_data=f'DO_:{id_user}'),
+                types.InlineKeyboardButton(text="Borrar" , callback_data=f'DO_:{id_user}')
+        ] 
+        keyboard.add(*ff)
+        for l_numero in l_numeros: 
+            numero = l_numero.get('numero')  
+            estado = l_numero.get('estado')
+            ban = l_numero.get('ban')
+            if ban != True:
+                e = "Activar" if not estado else "Desactivar" 
+                ff= [
+                    types.InlineKeyboardButton(text=numero, callback_data=f'DO_ln_VerNumero:{numero,id_user}'),
+                    types.InlineKeyboardButton(text=e, callback_data=f'DO_ActivarNumero:{numero,id_user}'),
+                    types.InlineKeyboardButton(text="Borrar" , callback_data=f'DO_:{id_user}')
+                ] 
+                keyboard.add(*ff)
+            
+          
+        keyboard.add(*f)
+
+        mensaje= main_bot.send_message(id_user, f"Aqui las lista de tus cuentas [{cuantes_cuentas}]",reply_markup=
+            keyboard,
+            parse_mode="Markdown") 
+        borrar_mensaje_en(5,id_user,mensaje)
+
+
+@main_bot.message_handler(func=lambda message: message.text in ['/'+ma_botones("lista_cuanta"),ma_botones("lista_cuanta")])
+def handle_AgregarAcc(message: types.Message):   
+    id_user=message.from_user.id
+    mensaje=0    
+    l=[]
+    hash_id=bd_obtener_hash_id(id_user) 
+    if(hash_id in [-1,0]):  
+        mensaje=main_bot.send_message(id_user, ma_falta_hash(),parse_mode='Markdown',reply_markup=btf_apihash_nuevo(id_user))
+        borrar_mensaje_en(3,id_user,mensaje)
+    else:   
+        ListarCuenta(5,0,id_user)
+    
 ##Comando defaul
 @main_bot.message_handler(func=lambda message: True)
-def handle_default(message: types.Message):     
-
+def handle_default(message: types.Message): 
     if message.from_user.id in lista_hashid_input:
         if message.text.isdigit(): 
             p = Principal()
@@ -414,21 +626,27 @@ def handle_default(message: types.Message):
         logger.info(f"User {message.from_user.id} envió [grupo] {message.text}"+horatodo())
         lista_grupo_input.remove(p.id_user)     
     elif message.from_user.id in lista_addnumero_input:              
-        p = Principal()
-        p=cargarPrincipal(obtener_informacion("Principal", message.from_user.id))  
-        p.grupo=message.text
-        p.id_user=message.from_user.id
-        guardar_informacion("Principal",message.from_user.id,p)  
-        AgregarAcc(message.chat.id)
-        logger.info(f"User {message.from_user.id} envió [grupo] {message.text}"+horatodo())
-        lista_grupo_input.remove(p.id_user)     
+        c= Cuenta()
+        c.id_usuario=message.chat.id 
+        c.fecha=horatodo()
+        c.numero=message.text 
+        guardar_informacion("Cuentas",str(message.chat.id)+message.text ,c)
+        agrego_new_numero(message.text,message.chat.id)
+        logger.info(f"User {message.from_user.id} envió [new#] {message.text}"+horatodo()) 
+        lista_addnumero_input.remove(message.chat.id)    
+    elif message.from_user.id in lista_addnumerocodigo_input2:
+        global lista_addnumerocodigo_input
+        for cuenta in lista_addnumerocodigo_input: 
+            if(cuenta.id_usuario == message.from_user.id):
+                agrego_new_numero2(message.text,cuenta.numero ,message.chat.id)     
+                lista_addnumerocodigo_input2.remove(message.from_user.id) 
+                lista_addnumerocodigo_input = [cuenta for cuenta in lista_addnumerocodigo_input if cuenta.id_usuario != message.from_user.id]
+      
+
     else:
         main_bot.send_message(message.chat.id, "Lo siento, no entiendo ese comando.")
         logger.info(f"User {message.from_user.id} envió [no] {message.text}"+horatodo())
 
-
-
-if __name__ == '__main__':
+if __name__ == '__main__':  
     main_bot.delete_webhook()
     main_bot.polling()
-
