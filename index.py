@@ -503,7 +503,6 @@ def handle_btf_DO_ActivarNumero(call):
         print("erroe\n",cx,"f\n")
     print("ya")
     
-
 @main_bot.callback_query_handler(func=lambda call: 'DO_ln_VerNumero' in call.data)
 def handle_btf_DO_ln_VerNumero(call):
     datos_callback = call.data.split(':') 
