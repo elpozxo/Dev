@@ -1034,6 +1034,10 @@ def BotRefe(client,bot,ref):
 ################################################################3
 
 async def validarcuenta(phone_number,canales): 
+    ##-1 cuenta sin activar
+    ##1 no canales??
+    ##2 no escribir
+    ##0 ok
     colorama.init(autoreset=True)
     Cverde = Style.RESET_ALL + Style.BRIGHT + Fore.GREEN
     Camarillo = Style.RESET_ALL + Style.BRIGHT + Fore.YELLOW
@@ -1043,7 +1047,7 @@ async def validarcuenta(phone_number,canales):
     client = TelegramClient("session/" + phone_number, api_id, api_hash)
     await client.connect()
     if not await client.is_user_authorized():        
-        print(Crojo +f"\n\nNo tengo autorizacion {phone_number}")
+        print(Crojo +f"No tengo autorizacion {phone_number}")
         return "No tengo autorizacion",-1
     else:
         tiempo = datetime.now()  

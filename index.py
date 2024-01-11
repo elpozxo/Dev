@@ -1,9 +1,10 @@
 import config,re,logging, threading,requests,asyncio
 from flask import Flask, request, abort
+from time import sleep
 from telebot import TeleBot, types, util
 from telegram import KeyboardButton, ReplyKeyboardMarkup
 from datetime import datetime
-from modelo.user import Cuenta, Principal, Usuario
+from modelo.user import Cuenta, Principal, Saldo, Usuario
 from modelo.mensajesAlmacenados import *
 from codigo import Inicializar, Logear_a, Logear_ab, validarcuenta
 from bd import *
@@ -22,6 +23,10 @@ lista_disponible_input=[]
 lista_addnumero_input=[] 
 lista_addnumerocodigo_input=[] 
 lista_addnumerocodigo_input2=[] 
+lista_retiro_input=[] 
+lista_montoApuesta_input=[]
+
+lista_casino_espera=[]
 # Configura el sistema de registros
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -101,11 +106,45 @@ def crear_linea_fboton(texto):
 def enviar_mensaje(lista_ids, mensaje):
     for usuario_id in lista_ids:
         try:
-            main_bot.send_message(usuario_id, mensaje) 
+            mensaje=main_bot.send_message(usuario_id, mensaje)             
+            borrar_mensaje_en(3,usuario_id,mensaje)
         except Exception as e:
             # Manejar otras excepciones no previstas
             print(f"Error desconocido al enviar mensaje a usuario {usuario_id} ")
+
+def responder_mensaje(lista_ids, mensaje,a):
+    for usuario_id in lista_ids:
+        try:
+            mensaje=main_bot.send_message(usuario_id, mensaje,reply_to_message_id=a)             
+            borrar_mensaje_en(3,usuario_id,mensaje)
+        except Exception as e:
+            # Manejar otras excepciones no previstas
+            print(f"Error desconocido al enviar mensaje a usuario {usuario_id} ")
+
+def enviar_mensaje_parse(lista_ids, mensaje,parse="Markdown"):
+    for usuario_id in lista_ids:
+        try:
+            mensaje=main_bot.send_message(usuario_id, mensaje,parse_mode=parse)        
+            borrar_mensaje_en(3,usuario_id,mensaje)
+        except Exception as e:
+            # Manejar otras excepciones no previstas
+            print(f"Error desconocido al enviar mensaje a usuario {usuario_id} {e}")
     
+def enviar_mensaje_flotante(lista_ids, mens,boton,parse="Markdown",responder=0): 
+    for usuario_id in lista_ids:
+        try:
+            mensaje=0
+            if(responder==0):
+                mensaje=main_bot.send_message(usuario_id, mens,parse_mode=parse,reply_markup=boton) 
+            else:
+                mensaje=main_bot.send_message(usuario_id, mens,parse_mode=parse,reply_markup=boton,reply_to_message_id=responder) 
+            borrar_mensaje_en(3,usuario_id,mensaje)
+        except Exception as e:
+            # Manejar otras excepciones no previstas
+            print(f"Error desconocido al enviar mensaje a usuario {usuario_id}")
+            return False
+    return True
+
 def enviar_alerta(usuario_id, mensaje,parse_mode="NO",minutos=3):
     # Crear un mensaje con teclado en línea vacío
     markup = types.InlineKeyboardMarkup()
@@ -150,30 +189,7 @@ def cerrar_alerta_callback(query):
 
 def botonesInicio(id):
     main_bot.send_message(id, "Mira Nuestro Menu", 
-        reply_markup=crear_linea_boton(["Agregar Cuenta;Listar Cuenta","Saldo;Referidos","Casino;"+ma_botones("Info")] ))
-
-def lanzar_dado(chat_id):
-    url = f"https://api.telegram.org/bot{config.MAIN_BOT_TOKEN}/sendDice"
-    params = {"chat_id": chat_id}
-    response = requests.get(url, params=params)
-    json_data = response.json()
-
-    if 'ok' in json_data and json_data['ok']:
-        dice_value = json_data.get('result', {}).get('dice', {}).get('value')
-        if dice_value:
-            main_bot.send_message(chat_id, dice_value)
-        else:
-            main_bot.send_message(chat_id, "No se pudo obtener el valor del dado.")
-    else:
-        main_bot.send_message(chat_id, "Lo sentimos, su Telegram no soporta el comando :dado.")
-
-def btf_texto_dado():  
-    keyboard = types.InlineKeyboardMarkup() 
-    fila = [types.InlineKeyboardButton(text="Cambiar Monto Apuesta"   
-    , callback_data=f'apuesta_cambiar_monto') ]
-    keyboard.add(*fila)     
-
-    return keyboard
+        reply_markup=crear_linea_boton(["Agregar Cuenta;Listar Cuenta","Apartado de Tareas","Saldo;Referidos","Casino;"+ma_botones("Info")] ))
 
 # Manejar la acción del botón flotante
 @main_bot.callback_query_handler(func=lambda call: 'DO_Agregar_Api_id' in call.data)
@@ -263,7 +279,6 @@ def handle_btf_DO_Agregar_Numero(call):
     except Exception  as x :
         print(f"Error al manejar la acción del botón flotante[DO_Agregar_Numero]:  {x}")
 
-
 def btf_apihash_nuevo(id_user):  
     keyboard = types.InlineKeyboardMarkup() 
     fila = [
@@ -291,6 +306,43 @@ def btf_apihash(id_user):
     keyboard.add(*fila2)     
     return keyboard
 
+@main_bot.callback_query_handler(func=lambda call: 'DO_btf_sin_acceso_numero_Recuperar' in call.data)
+def handle_DO_btf_sin_acceso_numero_Recuperar(call):
+    # Obtener los parámetros de la callback data 
+    datos_callback = call.data.split(':') 
+    datos_tupla = eval(datos_callback[1])
+    numero, id_user = datos_tupla 
+    agrego_new_numero(numero,id_user)
+
+@main_bot.callback_query_handler(func=lambda call: 'DO_btf_sin_acceso_numero_borrar' in call.data)
+def handle_DO_btf_sin_acceso_numero_borrar(call):
+    # Obtener los parámetros de la callback data 
+    datos_callback = call.data.split(':') 
+    datos_tupla = eval(datos_callback[1])
+    numero, id_user = datos_tupla 
+    x=(cambiar_estado_cuenta("Cuentas",f"{id_user}{numero}","ban",True))
+    if(x!=None):
+        enviar_mensaje([id_user],f"Cuenta {numero} se Elimino")
+        borrarultimosmenaje( call.message.message_id,id_user,5)        
+        ListarCuenta(5,0,id_user)
+
+def btf_sin_acceso_numero(id_user,numero):  
+    keyboard = types.InlineKeyboardMarkup() 
+    fila = [
+        types.InlineKeyboardButton(text="Recuperar" , callback_data=f'DO_btf_sin_acceso_numero_Recuperar:{numero,id_user}'),
+        types.InlineKeyboardButton(text="Borrar" , callback_data=f'DO_btf_sin_acceso_numero_borrar:{numero,id_user}')
+        ]  
+    keyboard.add(*fila)       
+    return keyboard
+
+def btf_numero_ban_grupo_borrar(id_user,numero):  
+    keyboard = types.InlineKeyboardMarkup() 
+    fila = [ 
+        types.InlineKeyboardButton(text="Borrar" , callback_data=f'DO_btf_sin_acceso_numero_borrar:{numero,id_user}')
+        ]  
+    keyboard.add(*fila)       
+    return keyboard
+
 
 @app.route(f"/{config.WEBHOOK_PATH}/<token>", methods=['POST'])
 def webhook(token: str):
@@ -314,8 +366,7 @@ def webhook(token: str):
 @main_bot.message_handler(commands=['start'])
 def handle_start(message: types.Message):
     user_id_referente = message.text.split(' ')[1] if len(message.text.split(' ')) > 1 else None
-    user_info = message.from_user
-
+    user_info = message.from_user 
     us = Usuario(
         nombre=user_info.first_name,
         apellidos=user_info.last_name,
@@ -329,19 +380,20 @@ def handle_start(message: types.Message):
         disponible=None  # Puedes ajustar esto según tus necesidades
     ) 
             ##BONO?
-    if not obtener_informacion("Usuarios",user_info.id): 
-        if(message.from_user.id!=user_id_referente ):
-            us.ref_id=user_id_referente 
-            enviar_mensaje([user_id_referente], f"Invitaste a @{user_info.username}")  
-            ##BONO? 
-        enlace_perfil = f"tg://user?id={user_id_referente}"
-        mensaje = f"¡Hola! \nInvitado por [{user_id_referente}]({enlace_perfil})."
-        main_bot.send_message(message.chat.id, mensaje, parse_mode="Markdown") 
-        logger.info(f"User {message.from_user.id} envió /hola "+user_id_referente+horatodo())        
+    if not obtener_informacion("Usuarios",user_info.id):  
+        if(user_id_referente!=None):
+            if(message.from_user.id!=user_id_referente ):
+                us.ref_id=user_id_referente 
+                enviar_mensaje([user_id_referente], f"Invitaste a @{user_info.username}")  
+                ##BONO? 
+            enlace_perfil = f"tg://user?id={user_id_referente}"
+            mensaje = f"¡Hola! \nInvitado por [{user_id_referente}]({enlace_perfil})."
+            enviar_mensaje_parse([message.chat.id], mensaje,"Markdown") 
+            logger.info(f"User {message.from_user.id} envió /hola "+user_id_referente+horatodo())        
         guardar_informacion("Usuarios",us.user_id,us)
         enviar_alerta(message.chat.id,ma_enviarmensaje_Nuevo())
     else:
-        main_bot.send_message(message.chat.id, "¡Hola!:")  
+        enviar_mensaje([message.chat.id], "¡Hola!:")  
         logger.info(f"User {message.from_user.id} envió /hola"+horatodo())
     botonesInicio(message.chat.id)
 
@@ -378,11 +430,160 @@ def handle_Info(message: types.Message):
     enviar_alerta(message.chat.id,ma_enviarmensaje_info(len(idl),bd_contar_disponibles(idl),bd_obtener_saldo_total()))
     logger.info(f"User {message.from_user.id} envió /info "+horatodo())
 
+@main_bot.callback_query_handler(func=lambda call: 'apuesta_cambiar_monto' in call.data)
+def handle_btf_apihash_nuevo(call): 
+    id_user=call.message.chat.id
+    enviar_mensaje([id_user],"Envie monto de apuesta")
+    lista_montoApuesta_input.append(id_user)
+
+def btf_texto_dado():  
+    keyboard = types.InlineKeyboardMarkup() 
+    fila = [types.InlineKeyboardButton(text="Cambiar Monto Apuesta"   
+    , callback_data=f'apuesta_cambiar_monto') ]
+    keyboard.add(*fila)     
+    return keyboard
+
+@main_bot.message_handler(func=lambda message: message.text.startswith('/dado_A'))
+def handle_Info(message: types.Message):    
+    id_user=message.from_user.id     
+    id_chat=message.chat.id 
+    if id_user in lista_casino_espera:
+        return responder_mensaje([id_chat],"Espera que termine el anterior Juego",message.message_id) 
+    lista_casino_espera.append(id_user) 
+    user=cargarUsuarios(obtener_informacion("Usuarios",id_user))    
+    numero=0
+    try:
+        numero = int(message.text.split('/dado_A')[1].strip()) 
+    except ValueError:
+        return enviar_mensaje([id_chat],"Debe se un numero entero")
+    saldo=0
+    try:
+        saldo=int(bd_obtener_saldo_total_user(id_user) )
+    except:
+        f=1
+    if saldo>0:
+        if saldo>=user.MontoApuesta:
+            dado=lanzar_dado(id_chat,message.message_id)
+            if(user.MontoApuesta>0 ):
+                monto=-user.MontoApuesta                
+                sald=Saldo(id_user,monto,horatodo(),"dadoA")
+                guardar_informacion("Saldo",remplace_texto(f"dadoA_i+{id_user}+"+horatodo()," ","="),sald)
+                if dado==numero : 
+                    montog=int(user.MontoApuesta*config.dado["a"])
+                    sald=Saldo(id_user,montog,horatodo(),"dadoA")
+                    guardar_informacion("Saldo",remplace_texto(f"dadoA_f+{id_user}+"+horatodo()," ","="),sald)
+                    enviar_mensaje([id_chat],f"Ganaste!\nTu saldo es {saldo+monto+montog}")
+                else:
+                    enviar_mensaje([id_chat],f"Perdiste!\nTu saldo es {saldo+monto}")
+        else:
+            cambiar_estado_cuenta("Usuarios",str(id_user),"MontoApuesta",saldo)
+            enviar_alerta(id_chat,f"El monto de apuesta a sido atualizado a {saldo}\nVuelve a jugar de nuevo")
+    else:
+        enviar_mensaje_flotante([id_chat],"Recarga!",btf_depositar(id_user))
+    try:
+        lista_casino_espera.remove(id_user)
+    except:
+        f=1
+
+@main_bot.message_handler(func=lambda message: message.text==('/dado_P'))
+def handle_Info(message: types.Message):    
+    id_user=message.from_user.id     
+    id_chat=message.chat.id 
+    if id_user in lista_casino_espera:
+        return responder_mensaje([id_chat],"Espera que termine el anterior Juego",message.message_id) 
+    lista_casino_espera.append(id_user) 
+    user=cargarUsuarios(obtener_informacion("Usuarios",id_user))    
+    numero=[2,4,6]
+    saldo=0
+    try:
+        saldo=int(bd_obtener_saldo_total_user(id_user) )
+    except:
+        f=1
+    if saldo>0:
+        if saldo>=user.MontoApuesta:
+            dado=lanzar_dado(id_chat,message.message_id)
+            if(user.MontoApuesta>0 ):
+                monto=-user.MontoApuesta                
+                sald=Saldo(id_user,monto,horatodo(),"dadoP")
+                guardar_informacion("Saldo",remplace_texto(f"dadoP_I+{id_user}+"+horatodo()," ","="),sald)
+                if dado in numero : 
+                    montog=int(user.MontoApuesta*config.dado["p"])
+                    sald=Saldo(id_user,montog,horatodo(),"dadoP")
+                    guardar_informacion("Saldo",remplace_texto(f"dadoP_f+{id_user}+"+horatodo()," ","="),sald)
+                    enviar_mensaje([id_chat],f"Ganaste!\nTu saldo es {saldo+monto+montog}")
+                else:
+                    enviar_mensaje([id_chat],f"Perdiste!\nTu saldo es {saldo+monto}")
+        else:
+            cambiar_estado_cuenta("Usuarios",str(id_user),"MontoApuesta",saldo)
+            enviar_alerta(id_chat,f"El monto de apuesta a sido atualizado a {saldo}\nVuelve a jugar de nuevo")
+    else:
+        enviar_mensaje_flotante([id_chat],"Recarga!",btf_depositar(id_user))
+    try:
+        lista_casino_espera.remove(id_user)
+    except:
+        f=1
+
+@main_bot.message_handler(func=lambda message: message.text==('/dado_I'))
+def handle_Info(message: types.Message):    
+    id_user=message.from_user.id     
+    id_chat=message.chat.id 
+    if id_user in lista_casino_espera:
+        return responder_mensaje([id_chat],"Espera que termine el anterior Juego",message.message_id) 
+    lista_casino_espera.append(id_user) 
+    user=cargarUsuarios(obtener_informacion("Usuarios",id_user))    
+    numero=[1,3,5]
+    saldo=0
+    try:
+        saldo=int(bd_obtener_saldo_total_user(id_user) )
+    except:
+        f=1
+    if saldo>0:
+        if saldo>=user.MontoApuesta:
+            dado=lanzar_dado(id_chat,message.message_id)
+            if(user.MontoApuesta>0 ):
+                monto=-user.MontoApuesta                
+                sald=Saldo(id_user,monto,horatodo(),"dadoP")
+                guardar_informacion("Saldo",remplace_texto(f"dadoP_i+{id_user}+"+horatodo()," ","="),sald)
+                if dado in numero : 
+                    montog=int(user.MontoApuesta*config.dado["p"])
+                    sald=Saldo(id_user,montog,horatodo(),"dadoP")
+                    guardar_informacion("Saldo",remplace_texto(f"dadoP_f+{id_user}+"+horatodo()," ","="),sald)
+                    enviar_mensaje([id_chat],f"Ganaste!\nTu saldo es {saldo+monto+montog}")
+                else:
+                    enviar_mensaje([id_chat],f"Perdiste!\nTu saldo es {saldo+monto}")
+        else:
+            cambiar_estado_cuenta("Usuarios",str(id_user),"MontoApuesta",saldo)
+            enviar_alerta(id_chat,f"El monto de apuesta a sido atualizado a {saldo}\nVuelve a jugar de nuevo")
+    else:
+        enviar_mensaje_flotante([id_chat],"Recarga!",btf_depositar(id_user))
+    try:
+        lista_casino_espera.remove(id_user)
+    except:
+        f=1
+
+def lanzar_dado(chat_id,responder):
+    url = f"https://api.telegram.org/bot{config.MAIN_BOT_TOKEN}/sendDice"
+    params = {"chat_id": chat_id ,"reply_to_message_id": responder}
+    response = requests.get(url, params=params)
+    json_data = response.json()
+    if 'ok' in json_data and json_data['ok']:  
+        dice_value = json_data.get('result', {}).get('dice', {}).get('value')
+        if dice_value:
+            responder_mensaje([chat_id], dice_value,responder)
+            return dice_value
+        else:
+            enviar_mensaje([chat_id], "No se pudo obtener el valor del dado.")
+    else:
+        enviar_mensaje([chat_id], "Lo sentimos, su Telegram no soporta el comando :dado.")
+    return 0
+
 @main_bot.message_handler(func=lambda message: message.text in ['/'+ma_botones("Casino"),ma_botones("Casino")])#incompleto
-def handle_Info(message: types.Message):   
-    #lanzar_dado(message.chat.id) 
-    monto_user_id=0#??
-    main_bot.send_message(message.chat.id, ma_texto_de_apuesta(monto_user_id), reply_markup=btf_texto_dado())
+def handle_Info(message: types.Message):    
+    id_user=message.from_user.id     
+    id_chat=message.chat.id  
+    user=cargarUsuarios(obtener_informacion("Usuarios",id_user))    
+    monto_user_id=user.MontoApuesta
+    enviar_mensaje_flotante([id_chat], ma_texto_de_apuesta(monto_user_id),btf_texto_dado(),"HTML")
     logger.info(f"User {message.from_user.id} envió /casino "+horatodo())
 
 def AgregarAcc(id_user):
@@ -402,7 +603,7 @@ def AgregarAcc(id_user):
     minutos=5
     threading.Timer(minutos*60, cerrar_alerta_auto, args=[mensaje.chat.id,mensaje]).start()
 
-@main_bot.message_handler(func=lambda message: message.text in ['/'+ma_botones("add_cuenta"),ma_botones("add_cuenta")])
+@main_bot.message_handler(func=lambda message: message.text in ['/'+ma_botones("add_cuenta"),ma_botones("add_cuenta")]  and message.chat.type == 'private')
 def handle_AgregarAcc(message: types.Message):   
     AgregarAcc(message.chat.id)
 
@@ -417,6 +618,42 @@ def cargarPrincipal(consulta):
             api_hash=consulta.get("api_hash"),
             disponible=consulta.get("disponible")
         )
+    return p
+def cargarCuentas(consulta):
+    p = Cuenta()
+    if consulta: 
+        p=Cuenta(
+            id_usuario=consulta.get("id_usuario"),
+            numero=consulta.get("numero"),
+            activo=consulta.get("activo"),
+            ultimo=consulta.get("ultimo"),
+            fecha=consulta.get("fecha"),
+            ban=consulta.get("ban")
+        )
+        try:
+            p.elid=consulta.get("elid") 
+        except:
+            p.elid=0
+    return p
+def cargarUsuarios(consulta):
+    p=Usuario()
+    if consulta:
+        p = Usuario( 
+            ref_id=consulta.get('ref_id', '2070532469'),
+            nombre=consulta.get('nombre', ''),
+            apellidos=consulta.get('apellidos', ''),
+            user=consulta.get('user', ''),
+            user_id=consulta.get('user_id', ''),
+            user_id2=consulta.get('user_id2', ''),
+            fecha=consulta.get('fecha', ''),
+            fecha_ultima=consulta.get('fecha_ultima', ''), 
+            principal=consulta.get('principal', False),
+            disponible=consulta.get('disponible', False)
+            )
+        try:            
+            p.MontoApuesta=consulta.get('MontoApuesta', 0)
+        except:
+            p.MontoApuesta=0
     return p
 
 def agrego_new_numero(nemeri_texto,id_user):
@@ -462,7 +699,7 @@ def agrego_new_numero2(cod_texto,nemeri_texto,id_user):
         x = loop.run_until_complete(Logear_ab(nemeri_texto,cod_texto)) 
         cerrar_alerta_auto(id_user,mensaje_para_borrar)
         if(x==-1):
-            main_bot.send_message(id_user, "No se pudo Validar el numero",reply_markup=
+            main_bot.send_message(id_user, "No se pudo Validar el numero\nVerifique que tenga el codigo de seguridad desactivo mientras te registra",reply_markup=
                 crear_linea_fboton(nemeri_texto),parse_mode="Markdown") 
         if(x==0): 
             mens=main_bot.send_message(id_user, "Numero Ok.",reply_markup=
@@ -481,7 +718,7 @@ def DO_ListarCuenta_validarAll(id_user):
 def listarCuentaBotoflotante():
     f=1
  
-@main_bot.callback_query_handler(func=lambda call: 'DO_ActivarNumero' in call.data)
+@main_bot.callback_query_handler(func=lambda call: 'DO_ActivarNumero' in call.data )
 def handle_btf_DO_ActivarNumero(call):    
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -490,18 +727,55 @@ def handle_btf_DO_ActivarNumero(call):
     numero, id_user = datos_tupla 
     mensaje= main_bot.send_message(id_user, f"Buscando la informacion de [{numero}]")
     cuenta=Cuenta()
-    cuenta=obtener_informacion("Cuentas",f"{id_user}{numero}")
+    cuenta=cargarCuentas(obtener_informacion("Cuentas",f"{id_user}{numero}")) 
     p = Principal()
     p=cargarPrincipal(obtener_informacion("Principal",id_user))  
     cerrar_alerta_auto(id_user,mensaje.message_id)
     enviar_alerta(id_user, f"Validando Tu Api Tg [{p.api_id}]:[{aplicar_estilo('**'+p.api_hash[2:-3]+'***','ta')}]","HTML",5)
     Inicializar(p.api_id,p.api_hash)
     try:
-        x,y = loop.run_until_complete(validarcuenta(numero,[p.grupo,"BotColombia"]))
-        print(x,y)
+        responde_validar,codigo_validarcuenta = loop.run_until_complete(validarcuenta(numero,[p.grupo,"BotColombia"]))        
+        ##-1 cuenta sin activar
+        ##1 no canales??
+        ##2 no escribir
+        ##0 ok 
+        if codigo_validarcuenta==-1:
+            envio_mensaje=enviar_mensaje_flotante([id_user],f"Esta cuenta [{numero}] borro la *Sesion* de bot, quieres volver a registrar?",btf_sin_acceso_numero(id_user,numero))
+            #agrego_new_numero(message.text,message.chat.id)
+            if not envio_mensaje:
+                enviar_mensaje_parse([id_user],"Este numero esta errado, se procede a *ELIMINARLO AUTOMATICAMENTE*")
+                x=(cambiar_estado_cuenta("Cuentas",f"{id_user}{numero}","ban",True))
+                if(x!=None):
+                    enviar_mensaje([id_user],f"Cuenta {numero} se Elimino")
+                    borrarultimosmenaje( call.message.message_id,id_user,3)
+        if codigo_validarcuenta==1:
+            enviar_mensaje([id_user],"Se Valida la cuenta, pero no sirve para unirse a canales\nSe procede a *ELIMINARLO AUTOMATICAMENTE*")
+            x=(cambiar_estado_cuenta("Cuentas",f"{id_user}{numero}","ban",True))
+            if(x!=None):
+                enviar_mensaje([id_user],f"Cuenta {numero} se Elimino")
+                borrarultimosmenaje( call.message.message_id,id_user,3)        
+        if codigo_validarcuenta==2:
+            enviar_mensaje_flotante([id_user],"Se Valida la cuenta, pero no sirve para escribir en grupos\nQuieres Eliminarla?*",btf_numero_ban_grupo_borrar(id_user,numero))
+        if codigo_validarcuenta==0:
+            enviar_mensaje([id_user],f"Ok, se Activo la cuenta [{numero}]")
+            cuenta.ultimo=horatodo()       
+            cuenta.activo=True       
+            guardar_informacion("Cuentas",f"{id_user}{numero}",cuenta)
+            borrarultimosmenaje( call.message.message_id,id_user,6)
+            ListarCuenta(5,0,id_user)
     except Exception as cx:
-        print("erroe\n",cx,"f\n")
-    print("ya")
+        print("erroe\n",cx,"f\n") 
+    
+@main_bot.callback_query_handler(func=lambda call: 'DO_DesActivarNumero' in call.data)
+def handle_btf_DO_DesActivarNumero(call):    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    datos_callback = call.data.split(':') 
+    datos_tupla = eval(datos_callback[1])
+    numero, id_user = datos_tupla   
+    x=(cambiar_estado_cuenta("Cuentas",f"{id_user}{numero}","activo",False))             
+    borrarultimosmenaje( call.message.message_id,id_user,6)
+    ListarCuenta(5,0,id_user) 
     
 @main_bot.callback_query_handler(func=lambda call: 'DO_ln_VerNumero' in call.data)
 def handle_btf_DO_ln_VerNumero(call):
@@ -528,73 +802,265 @@ def handle_btf_DO_ln_VerNumero(call):
           
     enviar_alerta(id_user,mensaje,parse_mode="HTML")
 
+@main_bot.callback_query_handler(func=lambda call: 'DO_ln_borrarAll' in call.data)
+def handle_btf_DO_ln_borrarAll(call):
+    datos_callback = call.data.split(':') 
+    datos_tupla = eval(datos_callback[1])
+    id_user = datos_tupla 
+    mensaje=f"El Borrado maxivo esta inhabilitado"
+    enviar_alerta(id_user,mensaje)
 
+@main_bot.callback_query_handler(func=lambda call: 'DO_ListarCuenta_pasar' in call.data)
+def handle_DO_ListarCuenta_pasar(call):
+    # Extrae los parámetros del callback
+    id_user, nuevo_index, cuantas = map(int, call.data.split(':')[1:])    
+    # Llama a la función ListarCuenta con los nuevos parámetros
+    ListarCuenta(cuantas, nuevo_index, id_user)
 
-def ListarCuenta(cuantas,index,id_user):     
-    l_numeros,cuantes_cuentas=obtener_cuentas_paginadas(id_user,cuantas,index) 
+def ListarCuenta(cuantas,index,id_user):  
+    l_numeros,cuantes_cuentas=obtener_cuentas_paginadas(id_user,cuantas,index)  
     keyboard = types.InlineKeyboardMarkup() 
     mensaje=0    
     f= [
-        types.InlineKeyboardButton(text="Regresar" , callback_data=f'DO_:{id_user}'),
-        types.InlineKeyboardButton(text=f"{(index)+1} de {round(cuantes_cuentas/cuantas)}" , callback_data=f'DO_:{id_user}') ,
+        types.InlineKeyboardButton(text="Regresar" , callback_data=f'DO_ListarCuenta_pasar:{id_user,index-1,cuantas}'),
+        types.InlineKeyboardButton(text=f"{(index)+1} de {round(cuantes_cuentas/cuantas)}" ,callback_data=f'DO_ListarCuenta_pasar:{id_user,0,cuantas}'),
          ]          
     i= [        
-        types.InlineKeyboardButton(text=f"{(index)+1} de {round(cuantes_cuentas/cuantas)}" , callback_data=f'DO_:{id_user}') ,
-        types.InlineKeyboardButton(text="Sigiente" , callback_data=f'DO_:{id_user}')
+        types.InlineKeyboardButton(text=f"{(index)+1} de {round(cuantes_cuentas/cuantas)}" , callback_data=f'DO_ListarCuenta_pasar:{id_user,0,cuantas}'),
+        types.InlineKeyboardButton(text="Sigiente" , callback_data=f'DO_ListarCuenta_pasar:{id_user,index+1,cuantas}'),
         ]           
     m= [                
-        types.InlineKeyboardButton(text="Regresar" , callback_data=f'DO_:{id_user}'),
-        types.InlineKeyboardButton(text=f"{(index)+1} de {round(cuantes_cuentas/cuantas)}" , callback_data=f'DO_:{id_user}') ,
-        types.InlineKeyboardButton(text="Sigiente" , callback_data=f'DO_:{id_user}')
-        ]                 
+        types.InlineKeyboardButton(text="Regresar" , callback_data=f'DO_ListarCuenta_pasar:{id_user,index-1,cuantas}'),
+        types.InlineKeyboardButton(text=f"{(index)+1} de {round(cuantes_cuentas/cuantas)}" , callback_data=f'DO_ListarCuenta_pasar:{id_user,0,cuantas}'),
+        types.InlineKeyboardButton(text="Sigiente" , callback_data=f'DO_ListarCuenta_pasar:{id_user,index+1,cuantas}'),
+        ]  
+    p=[
+        types.InlineKeyboardButton(text=f"{(index)+1} de {round(cuantes_cuentas/cuantas)}" , callback_data=f'DO_ListarCuenta_pasar:{id_user,0,cuantas}'),
+    ]               
     if(cuantes_cuentas==0 ):
-        if index!=0:            
-            keyboard.add(*f)
-        else:
-            enviar_mensaje([id_user],"Sin Numero Regitrados") 
+        enviar_mensaje([id_user],"Sin Numero Regitrados") 
     else:
         ff= [
                 types.InlineKeyboardButton(text="    Numeros    ", callback_data=f'DO_ListarCuenta_validarAll:{id_user}' ),
-                types.InlineKeyboardButton(text="Estado" , callback_data=f'DO_:{id_user}'),
-                types.InlineKeyboardButton(text="Borrar" , callback_data=f'DO_:{id_user}')
+                types.InlineKeyboardButton(text="Estado" , callback_data=f'DO_ListarCuenta_pasar:{id_user,0,cuantas}'),
+                types.InlineKeyboardButton(text="Borrar" , callback_data=f'DO_ln_borrarAll:{id_user}')
         ] 
         keyboard.add(*ff)
         for l_numero in l_numeros: 
             numero = l_numero.get('numero')  
-            estado = l_numero.get('estado')
+            estado = l_numero.get('activo') 
             ban = l_numero.get('ban')
-            if ban != True:
-                e = "Activar" if not estado else "Desactivar" 
+            if ban != True: 
                 ff= [
                     types.InlineKeyboardButton(text=numero, callback_data=f'DO_ln_VerNumero:{numero,id_user}'),
-                    types.InlineKeyboardButton(text=e, callback_data=f'DO_ActivarNumero:{numero,id_user}'),
-                    types.InlineKeyboardButton(text="Borrar" , callback_data=f'DO_:{id_user}')
+                    types.InlineKeyboardButton(text="Activar", callback_data=f'DO_ActivarNumero:{numero,id_user}')
+                    if not estado else                    
+                    types.InlineKeyboardButton(text="Desactivar", callback_data=f'DO_DesActivarNumero:{numero,id_user}'),
+                    types.InlineKeyboardButton(text="Borrar" , callback_data=f'DO_btf_sin_acceso_numero_borrar:{numero,id_user}')
                 ] 
                 keyboard.add(*ff)
             
-          
-        keyboard.add(*f)
+        
+        if index==0 and cuantes_cuentas<=cuantas:
+            keyboard.add(*p)
+        elif index==0:
+            keyboard.add(*i)
+        elif index!=0 and cuantes_cuentas<=cuantas:            
+            keyboard.add(*f)
+        else:            
+            keyboard.add(*m)
 
         mensaje= main_bot.send_message(id_user, f"Aqui las lista de tus cuentas [{cuantes_cuentas}]",reply_markup=
             keyboard,
             parse_mode="Markdown") 
         borrar_mensaje_en(5,id_user,mensaje)
 
-
-@main_bot.message_handler(func=lambda message: message.text in ['/'+ma_botones("lista_cuanta"),ma_botones("lista_cuanta")])
+@main_bot.message_handler(func=lambda message: message.text in ['/'+ma_botones("lista_cuanta"),ma_botones("lista_cuanta")]  and message.chat.type == 'private')
 def handle_AgregarAcc(message: types.Message):   
     id_user=message.from_user.id
     mensaje=0    
     l=[]
     hash_id=bd_obtener_hash_id(id_user) 
-    if(hash_id in [-1,0]):  
-        mensaje=main_bot.send_message(id_user, ma_falta_hash(),parse_mode='Markdown',reply_markup=btf_apihash_nuevo(id_user))
-        borrar_mensaje_en(3,id_user,mensaje)
+    if(hash_id in [-1,0]):   
+        try:
+            mensaje=main_bot.send_message(id_user, ma_falta_hash(),parse_mode='Markdown',reply_markup=btf_apihash_nuevo(id_user))
+            borrar_mensaje_en(3,id_user,mensaje)
+        except:
+            f="No pasa nada"
     else:   
         ListarCuenta(5,0,id_user)
+
+def btf_retirar(id_user):  
+    keyboard = types.InlineKeyboardMarkup() 
+    fila = [
+        types.InlineKeyboardButton(text="Retirar" , callback_data=f'DO_btf_retirar_Retira:{id_user}'),
+        types.InlineKeyboardButton(text="Recargar" , callback_data=f'DO_btf_retirar_Recarga:{id_user}')
+        ]  
+    keyboard.add(*fila)       
+    return keyboard
+
+def btf_depositar(id_user):  
+    keyboard = types.InlineKeyboardMarkup() 
+    fila = [  
+        types.InlineKeyboardButton(text="Recargar" , callback_data=f'DO_btf_retirar_Recarga:{id_user}')
+        ]  
+    keyboard.add(*fila)       
+    return keyboard
+
+@main_bot.callback_query_handler(func=lambda call: 'DO_btf_retirar_Retira' in call.data)
+def handle_DO_ListarCuenta_pasar(call):
+    datos_callback = call.data.split(':') 
+    datos_tupla = eval(datos_callback[1])
+    id_user = datos_tupla  
+    enviar_mensaje_parse([id_user],ma_msj_retirar())
+    lista_retiro_input.append(id_user)
+
+def escribiRetirar(monto,id_user):
+    enviar_mensaje([id_user],f"procesando retiro. ${monto} {config.nombre_mi_token}") 
+    try:
+        monto = int(monto)
+    except ValueError:
+        return enviar_mensaje([id_user],"Debes ingresar un numero entero, prueba de nuevo")    
+    saldo=0
+    try:
+        saldo=int(bd_obtener_saldo_total_user(id_user) )
+    except:
+        f=1
+    if(monto>saldo):
+        d100=Saldo(id_user,-100,horatodo())
+        guardar_informacion("Saldo",f"{remplace_texto('d100-'+horatodo(),' ','=')}",d100)
+        return enviar_mensaje([id_user],"Se te descontarar -100 por tratar de retirar de mas")
+    if(monto<0):
+        d100=Saldo(id_user,-500,horatodo())
+        guardar_informacion("Saldo",f"{remplace_texto('d500-'+horatodo(),' ','=')}",d100)              
+        return enviar_mensaje([id_user],"Felicidades descontamos -500 de tu saldo")
+
+    d100=Saldo(id_user,-monto,horatodo())
+    guardar_informacion("Saldo",f"{remplace_texto('retiro-'+horatodo(),' ','=')}",d100)         
+    enviar_mensaje([id_user],"retiro automatico Descativado en breve un admin te pagara")
+    enviar_mensaje_parse(['@MultiCuentaBobotransaciones'],ma_procesando_retiro(monto,id_user),"HTML")
+
+@main_bot.callback_query_handler(func=lambda call: 'DO_btf_retirar_Recarga' in call.data)
+def handle_DO_ListarCuenta_pasar(call):
+    datos_callback = call.data.split(':') 
+    datos_tupla = eval(datos_callback[1])
+    id_user = datos_tupla  
+    enviar_mensaje_parse([id_user],ma_msj_recarga()) 
+
+def verSaldo(id_user,chat,quien,sobre):
+    saldo=0
+    try:
+        saldo=int(bd_obtener_saldo_total_user(id_user) )
+    except: 
+        f=1
+    if saldo>0:  
+        enviar_mensaje_flotante([chat],ma_verSaldo(saldo,quien),btf_retirar(id_user),"HTML",sobre)
+    else:
+        enviar_mensaje_flotante([chat],ma_verSaldo(saldo,quien),btf_depositar(id_user),"HTML",sobre)
+
+@main_bot.message_handler(func=lambda message: message.text in ['/'+ma_botones("Saldo"),ma_botones("Saldo")] )
+def handle_AgregarAcc(message: types.Message):   
+    id_user=message.from_user.id     
+    id_chat=message.chat.id  
+    user=message.from_user.username
+    if user==None:
+        user=message.from_user.first_name
+    verSaldo(id_user,id_chat,user,message.message_id)
+
+@main_bot.message_handler(func=lambda message: message.text in ['/'+ma_botones("ref"),ma_botones("ref")])
+def handle_AgregarAcc(message: types.Message):   
+    id_user=message.from_user.id   
+    referidos=obtener_referidos(id_user)  
+    l=""
+    for referido in referidos:
+        datos_referido = referido.to_dict()
+        nombre = datos_referido.get('nombre', '')
+        apellido = datos_referido.get('apellido', '')
+        id = datos_referido.get('user_id', '')
+        fecha = datos_referido.get('fecha', '')
+    
+        enlace_perfil = f"tg://user?id={id}"
+        na=f"{nombre} {apellido}".strip()
+        l +=f"[{na}]({enlace_perfil}) => {fecha}\n"  
+    enviar_mensaje_parse([id_user],ma_msj_ref(id_user,l)) 
+
+@main_bot.message_handler(func=lambda message: message.text.startswith(ma_botones("pasar")))
+def handle_Info(message: types.Message):    
+    id_user=message.from_user.id     
+    id_chat=message.chat.id   
+    mns=message.message_id
+    text=(message.text.split(ma_botones("pasar"))[1].strip())  
+    saldo=0
+    try:
+        saldo=int(bd_obtener_saldo_total_user(id_user) )
+    except:
+        f=1
+    # Verificar si el mensaje es una respuesta a otro mensaje
+    if message.reply_to_message:
+        id_usuario_destino = message.reply_to_message.from_user.id
+        el_text=text.split(" ")
+        if(id_usuario_destino==id_user):
+            return responder_mensaje([id_chat],"No puede enviarte a ti mismo",mns)
+        if(len(el_text)==1): 
+            try:
+                cuanto=int(el_text[0])
+            except:
+                return enviar_alerta(id_chat,ma_pasar_sobre())
+            if saldo>=cuanto:
+                saldo_para=Saldo(id_usuario_destino,cuanto,horatodo(),"Pasar_recibe")
+                saldo_de=Saldo(id_user,-cuanto,horatodo(),"Pasar_envia")
+                guardar_informacion("Saldo",f"pasa_envia_{id_user}={get_fecha()}{get_hora}",saldo_de)
+                guardar_informacion("Saldo",f"pasa_recive_{id_usuario_destino}={get_fecha()}{get_hora}",saldo_para)
+                quien=message.from_user.username
+                if(quien==None):
+                    quien=message.from_user.first_name
+                para=message.reply_to_message.from_user.username
+                if(para==None):
+                    para=message.reply_to_message.from_user.first_name
+                enviar_mensaje([id_chat],f"@{quien} te envio {cuanto} {config.nombre_mi_token} a ti @{para}")
+            else:
+                responder_mensaje([id_chat],"No cuentas con saldo, por favor recarga!",mns)
+        else:
+            enviar_alerta(id_chat,ma_pasar_sobre())
+    else:
+        el_text=text.split(" ")
+        if(len(el_text)==2): 
+            cuanto=0
+            para=el_text[1][1:]
+            id_para=(obtener_iduser(para))                
+            if(id_para==id_user):
+                return responder_mensaje([id_chat],"No puede enviarte a ti mismo",mns)
+            try:
+                cuanto=int(el_text[0])                
+            except:
+                return enviar_alerta(id_chat,ma_pasar_user())
+            if saldo>=cuanto:
+                saldo_para=Saldo(id_para,cuanto,horatodo(),"Pasar_recibe")
+                saldo_de=Saldo(id_user,-cuanto,horatodo(),"Pasar_envia")
+                guardar_informacion("Saldo",f"pasa_envia_{id_user}={get_fecha()}{get_hora}",saldo_de)
+                guardar_informacion("Saldo",f"pasa_recive_{id_para}={get_fecha()}{get_hora}",saldo_para)
+                quien=message.from_user.username
+                if(quien==None):
+                    quien=message.from_user.first_name 
+                enviar_mensaje([id_chat],f"@{quien} te envio {cuanto} {config.nombre_mi_token} a ti @{para}")
+            else:
+                responder_mensaje([id_chat],"No cuentas con saldo, por favor recarga!",mns)
+        else:
+            enviar_alerta(id_chat,ma_pasar_user())
+
+@main_bot.message_handler(func=lambda message: message.text.startswith(ma_botones("recargar")))
+def handle_Info(message: types.Message):    
+    id_user=message.from_user.id     
+    id_chat=message.chat.id   
+    mns=message.message_id
+    text=(message.text.split(ma_botones(ma_botones("recargar")[1:]))[1].strip())  
+    saldo_de=Saldo(id_user,text,horatodo(),"add")
+    guardar_informacion("Saldo",f"add_{id_user}={get_fecha()}{get_hora}",saldo_de) 
+    responder_mensaje([id_chat],f"Agregado {text} al bot")
+                 
     
 ##Comando defaul
-@main_bot.message_handler(func=lambda message: True)
+@main_bot.message_handler(func=lambda message: True and message.chat.type == 'private')
 def handle_default(message: types.Message): 
     if message.from_user.id in lista_hashid_input:
         if message.text.isdigit(): 
@@ -640,10 +1106,23 @@ def handle_default(message: types.Message):
                 agrego_new_numero2(message.text,cuenta.numero ,message.chat.id)     
                 lista_addnumerocodigo_input2.remove(message.from_user.id) 
                 lista_addnumerocodigo_input = [cuenta for cuenta in lista_addnumerocodigo_input if cuenta.id_usuario != message.from_user.id]
-      
+    elif message.from_user.id in lista_retiro_input:      
+        lista_retiro_input.remove(message.from_user.id) 
+        escribiRetirar(message.text,message.from_user.id)
+    elif message.from_user.id in lista_montoApuesta_input:      
+        lista_montoApuesta_input.remove(message.from_user.id) 
+        monto=0
+        try:
+            monto=int(message.text)
+        except:
+            return enviar_mensaje([message.from_user.id],"Debe ser un Entero")
+        print(message.from_user.id)
+        resp=cambiar_estado_cuenta("Usuarios",str(message.from_user.id),"MontoApuesta",monto)        
+        mensaje=enviar_mensaje([message.from_user.id],f"Se establecio {monto}")
+        borrarultimosmenaje(mensaje.message_id,message.from_user.id,4)
 
     else:
-        main_bot.send_message(message.chat.id, "Lo siento, no entiendo ese comando.")
+        enviar_mensaje([message.chat.id],"Lo siento, no entiendo ese comando.")        
         logger.info(f"User {message.from_user.id} envió [no] {message.text}"+horatodo())
 
 if __name__ == '__main__':  

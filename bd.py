@@ -23,6 +23,18 @@ def obtener_informacion(coleccion, id):
     documento_ref = firestore.client().collection(coleccion).document(str(id))
     # Obtiene los datos del documento
     return documento_ref.get().to_dict()
+
+def cambiar_estado_cuenta(colecion,id,nombre_dato,dato):
+    # Referencia a la colección "Cuentas" en Firestore
+    coleccion_cuentas = firestore.client().collection(colecion)
+
+    # Obtener la referencia al documento de la cuenta
+    cuenta_ref = coleccion_cuentas.document(id)
+
+    # Actualizar el campo "estado" con el nuevo valor
+    cuenta_ref.update({nombre_dato: dato})
+    
+    return cuenta_ref.get().to_dict()
         
 def obtener_ids():
     # Obtiene una referencia a la colección "Usuarios"
@@ -64,7 +76,12 @@ def bd_contar_disponibles(id_users_principales):
 def bd_obtener_saldo_total():
     # Obtener el total de monto en la tabla saldo
     saldo_total_query =firestore.client().collection('Saldo')
-    return sum([doc.to_dict()['monto'] for doc in saldo_total_query.get()])
+    return sum([doc.to_dict()['saldo'] for doc in saldo_total_query.get()])
+
+def bd_obtener_saldo_total_user(id_user):
+    # Obtener el total de monto en la tabla saldo
+    saldo_total_query =firestore.client().collection('Saldo').where('id_usuario', '==', id_user)    
+    return sum([doc.to_dict()['saldo'] for doc in saldo_total_query.get()])
 
 def bd_obtener_hash_id(usuario_id):
     # Obtener una referencia a la colección "principal"
@@ -112,16 +129,38 @@ def obtener_cuentas_paginadas(id_usuario, n=5, l=0):
     cuenta_query = db \
         .where('id_usuario', '==', id_usuario)  
     # Obtener los documentos
-    cuentas = cuenta_query.stream()
+    cuentas = cuenta_query.stream() 
     # Crear una lista de resultados
     resultados = []
-    if cuentas:
+    resultados2 = []
+    if cuentas: 
         cuentas = list(cuentas)  # Convertir a lista para poder indexar
+        for cuenta in cuentas:
+            datos_cuenta = cuenta.to_dict() 
+            if(datos_cuenta.get("ban")!=True):
+                resultados2.append(datos_cuenta) 
+        cuentas=resultados2
+         
         inicio = l * n
         fin = inicio + n
         cuentas_pagina = cuentas[inicio:fin]
-        for cuenta in cuentas_pagina:
-            datos_cuenta = cuenta.to_dict()
-            resultados.append(datos_cuenta)
+        for cuenta in cuentas_pagina: 
+            resultados.append(cuenta)
     return resultados,len(cuentas)
  
+def obtener_referidos(id_usuario):    
+    principales_ref = firestore.client().collection("Usuarios")
+    # Realizar la consulta para el usuario_id específico
+    consulta = principales_ref.where('ref_id', '==', str(id_usuario))
+    return consulta.stream() 
+
+def obtener_iduser(arroba): 
+    principales_ref = firestore.client().collection("Usuarios")
+    # Realizar la consulta para el usuario específico
+    consulta = principales_ref.where('user', '==', arroba).limit(1).stream()
+    # Verificar si se encontró algún resultado
+    for usuario in consulta:
+        datos_usuario = usuario.to_dict()
+        # Verificar si el resultado tiene la clave 'user_id'
+        if 'user_id' in datos_usuario:
+            return datos_usuario['user_id']
