@@ -6,7 +6,7 @@ from telegram import KeyboardButton, ReplyKeyboardMarkup
 from datetime import datetime
 from modelo.user import Cuenta, Principal, Saldo, Usuario
 from modelo.mensajesAlmacenados import *
-from codigo import Inicializar, Logear_a, Logear_ab, validarcuenta
+from codigo import EjecutarTaarea, Inicializar, Logear_a, Logear_ab, validarcuenta
 from bd import *
 # Inicializar Firebase
 inicializar_firebase()
@@ -141,7 +141,7 @@ def enviar_mensaje_flotante(lista_ids, mens,boton,parse="Markdown",responder=0):
             borrar_mensaje_en(3,usuario_id,mensaje)
         except Exception as e:
             # Manejar otras excepciones no previstas
-            print(f"Error desconocido al enviar mensaje a usuario {usuario_id}")
+            print(f"Error desconocido al enviar enviar_mensaje_flotante a usuario {usuario_id} {e}")
             return False
     return True
 
@@ -189,7 +189,15 @@ def cerrar_alerta_callback(query):
 
 def botonesInicio(id):
     main_bot.send_message(id, "Mira Nuestro Menu", 
-        reply_markup=crear_linea_boton(["Agregar Cuenta;Listar Cuenta","Apartado de Tareas","Saldo;Referidos","Casino;"+ma_botones("Info")] ))
+        reply_markup=crear_linea_boton(
+            [
+                f"{ma_botones('add_cuenta')};{ma_botones('lista_cuanta')}",
+                f"{ma_botones('apartado')}",
+                f"{ma_botones('Saldo')};{ma_botones('ref')}",
+                f"{ma_botones('Casino')};{ma_botones('Info')}"
+            ] 
+        )
+    )
 
 # Manejar la acción del botón flotante
 @main_bot.callback_query_handler(func=lambda call: 'DO_Agregar_Api_id' in call.data)
@@ -447,15 +455,17 @@ def btf_texto_dado():
 def handle_Info(message: types.Message):    
     id_user=message.from_user.id     
     id_chat=message.chat.id 
+    msn=message.message_id
     if id_user in lista_casino_espera:
-        return responder_mensaje([id_chat],"Espera que termine el anterior Juego",message.message_id) 
+        return responder_mensaje([id_chat],"Espera que termine el anterior Juego",msn) 
     lista_casino_espera.append(id_user) 
     user=cargarUsuarios(obtener_informacion("Usuarios",id_user))    
     numero=0
     try:
         numero = int(message.text.split('/dado_A')[1].strip()) 
     except ValueError:
-        return enviar_mensaje([id_chat],"Debe se un numero entero")
+        lista_casino_espera.remove(id_user)
+        return responder_mensaje([id_chat],"Debe se un numero entero",msn)
     saldo=0
     try:
         saldo=int(bd_obtener_saldo_total_user(id_user) )
@@ -463,8 +473,8 @@ def handle_Info(message: types.Message):
         f=1
     if saldo>0:
         if saldo>=user.MontoApuesta:
-            dado=lanzar_dado(id_chat,message.message_id)
             if(user.MontoApuesta>0 ):
+                dado=lanzar_dado(id_chat,message.message_id)
                 monto=-user.MontoApuesta                
                 sald=Saldo(id_user,monto,horatodo(),"dadoA")
                 guardar_informacion("Saldo",remplace_texto(f"dadoA_i+{id_user}+"+horatodo()," ","="),sald)
@@ -472,14 +482,16 @@ def handle_Info(message: types.Message):
                     montog=int(user.MontoApuesta*config.dado["a"])
                     sald=Saldo(id_user,montog,horatodo(),"dadoA")
                     guardar_informacion("Saldo",remplace_texto(f"dadoA_f+{id_user}+"+horatodo()," ","="),sald)
-                    enviar_mensaje([id_chat],f"Ganaste!\nTu saldo es {saldo+monto+montog}")
+                    responder_mensaje([id_chat],f"Ganaste!\nTu saldo es {saldo+monto+montog}",msn)
                 else:
-                    enviar_mensaje([id_chat],f"Perdiste!\nTu saldo es {saldo+monto}")
+                    responder_mensaje([id_chat],f"Perdiste!\nTu saldo es {saldo+monto}",msn)
+            else:
+                responder_mensaje([id_chat],f"su monto de apuesta es de {user.MontoApuesta}",msn)
         else:
             cambiar_estado_cuenta("Usuarios",str(id_user),"MontoApuesta",saldo)
-            enviar_alerta(id_chat,f"El monto de apuesta a sido atualizado a {saldo}\nVuelve a jugar de nuevo")
+            responder_mensaje([id_chat],f"El monto de apuesta a sido atualizado a {saldo}\nVuelve a jugar de nuevo",msn)
     else:
-        enviar_mensaje_flotante([id_chat],"Recarga!",btf_depositar(id_user))
+        enviar_mensaje_flotante([id_chat],f"@{message.from_user.username} Recarga!",btf_depositar(id_user))
     try:
         lista_casino_espera.remove(id_user)
     except:
@@ -488,7 +500,8 @@ def handle_Info(message: types.Message):
 @main_bot.message_handler(func=lambda message: message.text==('/dado_P'))
 def handle_Info(message: types.Message):    
     id_user=message.from_user.id     
-    id_chat=message.chat.id 
+    id_chat=message.chat.id    
+    msn=message.message_id
     if id_user in lista_casino_espera:
         return responder_mensaje([id_chat],"Espera que termine el anterior Juego",message.message_id) 
     lista_casino_espera.append(id_user) 
@@ -501,8 +514,8 @@ def handle_Info(message: types.Message):
         f=1
     if saldo>0:
         if saldo>=user.MontoApuesta:
-            dado=lanzar_dado(id_chat,message.message_id)
-            if(user.MontoApuesta>0 ):
+            if(user.MontoApuesta>0 ):                
+                dado=lanzar_dado(id_chat,message.message_id)
                 monto=-user.MontoApuesta                
                 sald=Saldo(id_user,monto,horatodo(),"dadoP")
                 guardar_informacion("Saldo",remplace_texto(f"dadoP_I+{id_user}+"+horatodo()," ","="),sald)
@@ -510,14 +523,16 @@ def handle_Info(message: types.Message):
                     montog=int(user.MontoApuesta*config.dado["p"])
                     sald=Saldo(id_user,montog,horatodo(),"dadoP")
                     guardar_informacion("Saldo",remplace_texto(f"dadoP_f+{id_user}+"+horatodo()," ","="),sald)
-                    enviar_mensaje([id_chat],f"Ganaste!\nTu saldo es {saldo+monto+montog}")
+                    responder_mensaje([id_chat],f"Ganaste!\nTu saldo es {saldo+monto+montog}",msn)
                 else:
-                    enviar_mensaje([id_chat],f"Perdiste!\nTu saldo es {saldo+monto}")
+                    responder_mensaje([id_chat],f"Perdiste!\nTu saldo es {saldo+monto}",msn)
+            else:
+                responder_mensaje([id_chat],f"su monto de apuesta es de {user.MontoApuesta}",msn)
         else:
             cambiar_estado_cuenta("Usuarios",str(id_user),"MontoApuesta",saldo)
-            enviar_alerta(id_chat,f"El monto de apuesta a sido atualizado a {saldo}\nVuelve a jugar de nuevo")
+            responder_mensaje([id_chat],f"El monto de apuesta a sido atualizado a {saldo}\nVuelve a jugar de nuevo",msn)
     else:
-        enviar_mensaje_flotante([id_chat],"Recarga!",btf_depositar(id_user))
+        enviar_mensaje_flotante([id_chat],f"@{message.from_user.username} Recarga!",btf_depositar(id_user))
     try:
         lista_casino_espera.remove(id_user)
     except:
@@ -526,7 +541,8 @@ def handle_Info(message: types.Message):
 @main_bot.message_handler(func=lambda message: message.text==('/dado_I'))
 def handle_Info(message: types.Message):    
     id_user=message.from_user.id     
-    id_chat=message.chat.id 
+    id_chat=message.chat.id     
+    msn=message.message_id
     if id_user in lista_casino_espera:
         return responder_mensaje([id_chat],"Espera que termine el anterior Juego",message.message_id) 
     lista_casino_espera.append(id_user) 
@@ -539,23 +555,25 @@ def handle_Info(message: types.Message):
         f=1
     if saldo>0:
         if saldo>=user.MontoApuesta:
-            dado=lanzar_dado(id_chat,message.message_id)
-            if(user.MontoApuesta>0 ):
+            if(user.MontoApuesta>0 ):                
+                dado=lanzar_dado(id_chat,message.message_id)
                 monto=-user.MontoApuesta                
-                sald=Saldo(id_user,monto,horatodo(),"dadoP")
+                sald=Saldo(id_user,monto,horatodo(),"dadoI")
                 guardar_informacion("Saldo",remplace_texto(f"dadoP_i+{id_user}+"+horatodo()," ","="),sald)
                 if dado in numero : 
                     montog=int(user.MontoApuesta*config.dado["p"])
-                    sald=Saldo(id_user,montog,horatodo(),"dadoP")
+                    sald=Saldo(id_user,montog,horatodo(),"dadoI")
                     guardar_informacion("Saldo",remplace_texto(f"dadoP_f+{id_user}+"+horatodo()," ","="),sald)
-                    enviar_mensaje([id_chat],f"Ganaste!\nTu saldo es {saldo+monto+montog}")
+                    responder_mensaje([id_chat],f"Ganaste!\nTu saldo es {saldo+monto+montog}",msn)
                 else:
-                    enviar_mensaje([id_chat],f"Perdiste!\nTu saldo es {saldo+monto}")
+                    responder_mensaje([id_chat],f"Perdiste!\nTu saldo es {saldo+monto}",msn)
+            else:
+                responder_mensaje([id_chat],f"su monto de apuesta es de {user.MontoApuesta}",msn)
         else:
             cambiar_estado_cuenta("Usuarios",str(id_user),"MontoApuesta",saldo)
-            enviar_alerta(id_chat,f"El monto de apuesta a sido atualizado a {saldo}\nVuelve a jugar de nuevo")
+            responder_mensaje([id_chat],f"El monto de apuesta a sido atualizado a {saldo}\nVuelve a jugar de nuevo",msn)
     else:
-        enviar_mensaje_flotante([id_chat],"Recarga!",btf_depositar(id_user))
+        enviar_mensaje_flotante([id_chat],f"@{message.from_user.username} Recarga!",btf_depositar(id_user))
     try:
         lista_casino_espera.remove(id_user)
     except:
@@ -583,7 +601,10 @@ def handle_Info(message: types.Message):
     id_chat=message.chat.id  
     user=cargarUsuarios(obtener_informacion("Usuarios",id_user))    
     monto_user_id=user.MontoApuesta
-    enviar_mensaje_flotante([id_chat], ma_texto_de_apuesta(monto_user_id),btf_texto_dado(),"HTML")
+    if message.chat.type == 'private':
+        enviar_mensaje_flotante([id_chat], ma_texto_de_apuesta(monto_user_id),btf_texto_dado(),"HTML")
+    else:
+        enviar_mensaje_parse([id_chat], ma_texto_de_apuesta(monto_user_id),"HTML")
     logger.info(f"User {message.from_user.id} envió /casino "+horatodo())
 
 def AgregarAcc(id_user):
@@ -927,15 +948,15 @@ def escribiRetirar(monto,id_user):
     except:
         f=1
     if(monto>saldo):
-        d100=Saldo(id_user,-100,horatodo())
+        d100=Saldo(id_user,-100,horatodo(),"RetiroMalisioso")
         guardar_informacion("Saldo",f"{remplace_texto('d100-'+horatodo(),' ','=')}",d100)
         return enviar_mensaje([id_user],"Se te descontarar -100 por tratar de retirar de mas")
     if(monto<0):
-        d100=Saldo(id_user,-500,horatodo())
+        d100=Saldo(id_user,-500,horatodo(),"RetiroNegativo")
         guardar_informacion("Saldo",f"{remplace_texto('d500-'+horatodo(),' ','=')}",d100)              
         return enviar_mensaje([id_user],"Felicidades descontamos -500 de tu saldo")
 
-    d100=Saldo(id_user,-monto,horatodo())
+    d100=Saldo(id_user,-monto,horatodo(),"Retiro")
     guardar_informacion("Saldo",f"{remplace_texto('retiro-'+horatodo(),' ','=')}",d100)         
     enviar_mensaje([id_user],"retiro automatico Descativado en breve un admin te pagara")
     enviar_mensaje_parse(['@MultiCuentaBobotransaciones'],ma_procesando_retiro(monto,id_user),"HTML")
@@ -947,12 +968,14 @@ def handle_DO_ListarCuenta_pasar(call):
     id_user = datos_tupla  
     enviar_mensaje_parse([id_user],ma_msj_recarga()) 
 
-def verSaldo(id_user,chat,quien,sobre):
+def verSaldo(id_user,chat,quien,sobre,privado):
     saldo=0
     try:
         saldo=int(bd_obtener_saldo_total_user(id_user) )
     except: 
         f=1
+    if not privado:
+        return enviar_mensaje_parse([chat],ma_verSaldo(saldo,quien)[:-32],"HTML")
     if saldo>0:  
         enviar_mensaje_flotante([chat],ma_verSaldo(saldo,quien),btf_retirar(id_user),"HTML",sobre)
     else:
@@ -965,7 +988,10 @@ def handle_AgregarAcc(message: types.Message):
     user=message.from_user.username
     if user==None:
         user=message.from_user.first_name
-    verSaldo(id_user,id_chat,user,message.message_id)
+    priv=False
+    if message.chat.type == 'private':
+        priv=True
+    verSaldo(id_user,id_chat,user,message.message_id,priv)
 
 @main_bot.message_handler(func=lambda message: message.text in ['/'+ma_botones("ref"),ma_botones("ref")])
 def handle_AgregarAcc(message: types.Message):   
@@ -1009,8 +1035,8 @@ def handle_Info(message: types.Message):
             if saldo>=cuanto:
                 saldo_para=Saldo(id_usuario_destino,cuanto,horatodo(),"Pasar_recibe")
                 saldo_de=Saldo(id_user,-cuanto,horatodo(),"Pasar_envia")
-                guardar_informacion("Saldo",f"pasa_envia_{id_user}={get_fecha()}{get_hora}",saldo_de)
-                guardar_informacion("Saldo",f"pasa_recive_{id_usuario_destino}={get_fecha()}{get_hora}",saldo_para)
+                guardar_informacion("Saldo",f"pasa_envia_{id_user}={get_fecha()}{get_hora()}",saldo_de)
+                guardar_informacion("Saldo",f"pasa_recive_{id_usuario_destino}={get_fecha()}{get_hora()}",saldo_para)
                 quien=message.from_user.username
                 if(quien==None):
                     quien=message.from_user.first_name
@@ -1037,8 +1063,8 @@ def handle_Info(message: types.Message):
             if saldo>=cuanto:
                 saldo_para=Saldo(id_para,cuanto,horatodo(),"Pasar_recibe")
                 saldo_de=Saldo(id_user,-cuanto,horatodo(),"Pasar_envia")
-                guardar_informacion("Saldo",f"pasa_envia_{id_user}={get_fecha()}{get_hora}",saldo_de)
-                guardar_informacion("Saldo",f"pasa_recive_{id_para}={get_fecha()}{get_hora}",saldo_para)
+                guardar_informacion("Saldo",f"pasa_envia_{id_user}={get_fecha()}{get_hora()}",saldo_de)
+                guardar_informacion("Saldo",f"pasa_recive_{id_para}={get_fecha()}{get_hora()}",saldo_para)
                 quien=message.from_user.username
                 if(quien==None):
                     quien=message.from_user.first_name 
@@ -1048,17 +1074,221 @@ def handle_Info(message: types.Message):
         else:
             enviar_alerta(id_chat,ma_pasar_user())
 
-@main_bot.message_handler(func=lambda message: message.text.startswith(ma_botones("recargar")))
+@main_bot.message_handler(func=lambda message: message.text.startswith(ma_botones("recargar")) and message.chat.type == 'private')
 def handle_Info(message: types.Message):    
-    id_user=message.from_user.id     
+    id_user=message.from_user.id  
     id_chat=message.chat.id   
     mns=message.message_id
-    text=(message.text.split(ma_botones(ma_botones("recargar")[1:]))[1].strip())  
-    saldo_de=Saldo(id_user,text,horatodo(),"add")
-    guardar_informacion("Saldo",f"add_{id_user}={get_fecha()}{get_hora}",saldo_de) 
-    responder_mensaje([id_chat],f"Agregado {text} al bot")
+    if(es_admin(id_user)):    
+        try:
+            text=int(message.text.split(ma_botones("recargar")[1:])[1].strip())   
+            saldo_de=Saldo(id_user,text,horatodo(),"add")
+            guardar_informacion("Saldo",f"add_{id_user}={get_fecha()}{get_hora()}",saldo_de) 
+            responder_mensaje([id_chat],f"Agregado {text} al bot",mns)
+        except:
+            responder_mensaje([id_chat],f":V: Agregado {text} al bot",mns)
+    else:
+        responder_mensaje([id_chat],f":V Agregado ",mns)
+
+@main_bot.message_handler(func=lambda message: message.text=="Rcasino" and message.chat.type == 'private')
+def handle_Info(message: types.Message):    
+    id_user=message.from_user.id  
+    id_chat=message.chat.id   
+    mns=message.message_id
+    if(es_admin(id_user)):            
+        lista_casino_espera=[]
+    else:
+        try:
+            lista_casino_espera.remove(id_user)
+        except:
+            f=1
+    responder_mensaje([id_chat],f"Listo, ya puede segir jugando",mns) 
+
+@main_bot.message_handler(func=lambda message: message.text=="Tsaldo" and message.chat.type == 'private')
+def handle_Info(message: types.Message):    
+    id_user=message.from_user.id  
+    id_chat=message.chat.id   
+    mns=message.message_id
+    if(es_admin(id_user)):          
+        l=""
+        for id_usuario, suma in obtener_saldos_agrupados().items():
+            link=f"<a href='tg://user?id={id_usuario}'>{id_usuario}</a> <b>{suma}</b> /TPsaldo_{id_usuario}\n"
+            l+=link
+        enviar_mensaje_parse([id_chat],l,"HTML")
+    else:
+        id_user=message.from_user.id     
+        id_chat=message.chat.id  
+        user=message.from_user.username
+        if user==None:
+            user=message.from_user.first_name
+        verSaldo(id_user,id_chat,user,message.message_id,True)
+@main_bot.message_handler(func=lambda message: message.text=="TLsaldo" and message.chat.type == 'private')
+def handle_Info(message: types.Message):    
+    id_user=message.from_user.id  
+    id_chat=message.chat.id   
+    mns=message.message_id
+    if(es_admin(id_user)):          
+        l=""
+        for id_usuario, suma in obtener_saldos_agrupados().items():
+            link=f"<a href='tg://user?id={id_usuario}'>{id_usuario}</a> <b>{suma}</b> \n"
+            l+=link
+        enviar_mensaje_parse([id_chat],l,"HTML")
+    else:
+        id_user=message.from_user.id     
+        id_chat=message.chat.id  
+        user=message.from_user.username
+        if user==None:
+            user=message.from_user.first_name
+        verSaldo(id_user,id_chat,user,message.message_id,True)
                  
+@main_bot.message_handler(func=lambda message: message.text.startswith("/TPsaldo") and message.chat.type == 'private')
+def handle_Info(message: types.Message):    
+    id_user=message.from_user.id  
+    id_chat=message.chat.id   
+    mns=message.message_id    
+    if(es_admin(id_user)):          
+        x=int(message.text.split("_")[1].strip())
+        l=f"@{obtener_arroba(x)} {bd_obtener_saldo_total_user(x)} {config.nombre_mi_token}\n"
+        for motivo, suma in obtener_saldos_id_agrupados(x).items():
+            link=f"<b>{motivo}</b>  {suma}\n"
+            l+=link
+        enviar_mensaje_parse([id_chat],l,"HTML")
+    else:
+        id_user=message.from_user.id     
+        id_chat=message.chat.id  
+        user=message.from_user.username
+        if user==None:
+            user=message.from_user.first_name
+        verSaldo(id_user,id_chat,user,message.message_id,True)
+                 
+@main_bot.message_handler(func=lambda message: message.text==ma_botones("apartado") and message.chat.type == 'private')
+def handle_Info(message: types.Message):    
+    id_user=message.from_user.id  
+    id_chat=message.chat.id   
+    mns=message.message_id
+     
+    enviar_mensaje_parse([id_chat],
+                         """
+Aqui esta una breve descripcion de alguno de los comando principales del bot,
+Todo detayado y con ejemplo estara en el canal @multicuentabobot_ayuda
+
+<pre>Uniserce a Canales/Grupos publicos</pre><b>/unirser</b> Ejp  <i>/uniser @botcolombiachat,@multicuentabobot_ayuda</i> 
+
+<pre>Uniserce a Canales/Grupos privado</pre><b>/unirserPriv</b> Ejp  <i>/uniserPriv hacsa+1233ko1,+23iojd8w8s-jw</i>
+
+<pre>Uniserce a Bot</pre><b>/botRef</b> Ejp  <i>/botRef https://t.me/mult1sbot?start=2070532469</i>
+<b>/bot</b> Ejp  <i>/botRef @mult1sbot</i>
+<b>/ref</b> Ejp  <i>/botRef 2070532469</i>
+
+<pre>Enviar mensaje</pre><b>/mensaje</b> Ejp  <i>/mensaje  ✅  check</i>
+
+<pre>Esperar Segundos</pre><b>/espera</b> Ejp  <i>/espera 5</i>
+
+<b>Ok</b>
+envia /tarea + la combinancion que quiera que haga tus cuentas
+
+el codigo lo ejecutara con tu primera cuenta, y luego preguntara si continua con las demas
+"""
+                         ,"HTML")
+
+@main_bot.message_handler(func=lambda message: message.text.startswith("/ayuda") and message.chat.type == 'private')
+def handle_Info(message: types.Message):    
+    id_user=message.from_user.id  
+    id_chat=message.chat.id   
+    mns=message.message_id    
+    enviar_mensaje_parse([id_chat],
+"""<b>Descripcion de los comando bot</b>""","HTML")
+    enviar_mensaje_parse([id_chat],
+"""<pre>Uniserce a Canales/Grupos publicos</pre><b>#uniser</b> 
+Ejp  
+<i>#unirser @botcolombiachat,@multicuentabobot_ayuda</i> 
+<i>#unirser https://t.me/botcolombiachat,https://t.me/multicuentabobot_ayuda</i> 
+
+recuerda <b>no usar espacio</b> para separar los canales a unirte, solo <b>","</b>
+se cobra cada 9 link
+"""
+,"HTML")
+    enviar_mensaje_parse([id_chat],
+"""<pre>Uniserce a Canales/Grupos privado</pre><b>/unirserPriv</b> 
+Ejp  
+<i>#unirserPriv @+23thsGo2VEhiYTBh</i> 
+<i>#unisrerPriv https://t.me/+23thsGo2VEhiYTBh</i> 
+
+recuerda <b>no usar espacio</b> para separar los canales a unirte, solo <b>","</b>
+se cobra cada 9 link
+"""
+,"HTML")
+    enviar_mensaje_parse([id_chat],
+"""<pre>Uniserce a Bot</pre><b>#botRef</b> Ejp  <i>#botRef https://t.me/mult1sbot?start=2070532469</i>
+por si tienes el link completo
+<b>#bot</b> Ejp  <i>/bot @mult1sbot</i>
+por si tiene el arroba de bor
+<b>#ref</b> Ejp  <i>/Ref 2070532469</i>
+y el parametro de referencia
+"""
+,"HTML")
+    enviar_mensaje_parse([id_chat],
+"""<pre>Enviar mensaje</pre><b>#mensaje</b> Ejp  <i>#mensaje ✅ check</i>
+
+este mensaje se envia a el parametro de @bot
+
+Tambien podemos enviar mensaje extra asi #mensajextra @botcolombiachat ✅ check
+donde @botcolobiachat es username a quien le enviara el mensaje
+
+Tambien  podemos enviar un rando asi #mensajedom mensaje 1;;mensaje 2;;mensaje 3
+donde aleatoriamente selecionamos 1 y se envia
+"""
+,"HTML")
+    enviar_mensaje_parse([id_chat],
+"""<pre>Utilez</pre>
+
+Tambien  podemos esperar asi #esperar 5
+donde 5 sig 5seg de espera para realizar la sig accion
+
+Tambien podemos crear cadena texto o numero de x largo
+#numero 5  ó #letra 5
+donde 5 es el largo del texto a crear
+
+tambien podemos buscar tu dirrecion wallet de una token en @cctit_bot
+#wallet bttnew
+donde regresa una direcion trc20
+#wallet2 trx 0
+donde regresa una direcion de una opciones de red la numero 0
+"""
+,"HTML")
+
+
+def tarea(el_text,cuantas,id_user,mns,principal):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)  
+    nerror,error,contador = loop.run_until_complete(EjecutarTaarea(el_text,cuantas,principal)  )
+    if(nerror==-1):
+        responder_mensaje([id_user],f"la cuenta {error} perdio el acceso, asi que el sistema la eliminara.\n"\
+                          "Recuerda borrar las cuenta que le elimines el acceso al bot\n"
+                          f"La tarea se detubo en la cuenta numero {contador}",mns)
+        cambiar_estado_cuenta("Cuentas",f"{id_user}{error}","ban",True)
+    if(nerror==0):
+        responder_mensaje([id_user],f"Termine!\n\nobtube estos errores {error}",mns)
+   
+   
+@main_bot.message_handler(func=lambda message: message.text.startswith("/tarea") and message.chat.type == 'private')
+def handle_Info(message: types.Message):  
+    id_user=message.from_user.id  
+    id_chat=message.chat.id   
+    mns=message.message_id    
     
+    hash_id=bd_obtener_hash_id(id_user) 
+    if(hash_id in [-1,0]):   
+        return enviar_mensaje([id_chat],"Debe regitrar cuentas para poder usar el apartado tarea")
+    p = Principal()
+    p=cargarPrincipal(obtener_informacion("Principal",id_user))  
+    Inicializar(p.api_id,p.api_hash) 
+    cuantas,cantidad=obtener_cuentas_paginadas(id_user,1000,0) 
+    text=(message.text.split("/tarea")[1])  
+    el_text=text.split("#")  
+    responder_mensaje([id_chat],"Iniciando",mns)
+    tarea(el_text,cuantas,id_user,mns,p)
+
 ##Comando defaul
 @main_bot.message_handler(func=lambda message: True and message.chat.type == 'private')
 def handle_default(message: types.Message): 
@@ -1115,16 +1345,34 @@ def handle_default(message: types.Message):
         try:
             monto=int(message.text)
         except:
-            return enviar_mensaje([message.from_user.id],"Debe ser un Entero")
-        print(message.from_user.id)
-        resp=cambiar_estado_cuenta("Usuarios",str(message.from_user.id),"MontoApuesta",monto)        
-        mensaje=enviar_mensaje([message.from_user.id],f"Se establecio {monto}")
-        borrarultimosmenaje(mensaje.message_id,message.from_user.id,4)
+            return enviar_mensaje([message.from_user.id],"Debe ser un Entero") 
+        cambiar_estado_cuenta("Usuarios",str(message.from_user.id),"MontoApuesta",monto)        
+        mensaje=enviar_mensaje([message.from_user.id],f"Se establecio {monto}") 
 
     else:
         enviar_mensaje([message.chat.id],"Lo siento, no entiendo ese comando.")        
         logger.info(f"User {message.from_user.id} envió [no] {message.text}"+horatodo())
 
-if __name__ == '__main__':  
+ 
+
+def main():
+    while True:
+        try:
+            main_bot.delete_webhook()
+            main_bot.polling()
+
+        except Exception as e:
+            print(f"\n\n{e}\n\n") 
+            enviar_mensaje([2070532469],e)
+            # Espera un tiempo antes de reiniciar
+            print("Reiniciando en 5 segundos...")
+            sleep(5) 
+            print("Reiniciado...")
+def nomain(): 
     main_bot.delete_webhook()
     main_bot.polling()
+ 
+
+if __name__ == '__main__':
+    main()
+    #nomain()

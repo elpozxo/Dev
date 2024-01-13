@@ -164,3 +164,48 @@ def obtener_iduser(arroba):
         # Verificar si el resultado tiene la clave 'user_id'
         if 'user_id' in datos_usuario:
             return datos_usuario['user_id']
+def obtener_arroba(iduser): 
+    principales_ref = firestore.client().collection("Usuarios")
+    # Realizar la consulta para el usuario específico
+    consulta = principales_ref.where('user_id', '==', iduser).limit(1).stream()
+    # Verificar si se encontró algún resultado
+    for usuario in consulta:
+        datos_usuario = usuario.to_dict()
+        # Verificar si el resultado tiene la clave 'user_id'
+        if 'user' in datos_usuario:
+            return datos_usuario['user']
+
+def obtener_saldos_agrupados():
+    # Obtén una referencia a la colección Saldo
+    saldo_ref = firestore.client().collection('Saldo')
+    # Obtén todos los documentos de la colección Saldo
+    documentos_saldo = saldo_ref.stream()
+    # Crear un diccionario para almacenar las sumas por id
+    sumas_por_id = {}
+    # Iterar sobre los documentos de Saldo
+    for doc in documentos_saldo:
+        # Obtener datos del documento Saldo
+        datos_saldo = doc.to_dict()
+        id_usuario = datos_saldo.get('id_usuario')
+        monto = int(datos_saldo.get('saldo', 0))
+        # Sumar el monto al total para el id de usuario correspondiente
+        sumas_por_id[id_usuario] = sumas_por_id.get(id_usuario, 0) + monto
+    return sumas_por_id
+    
+def obtener_saldos_id_agrupados(id):
+    # Obtén una referencia a la colección Saldo
+    saldo_ref = firestore.client().collection('Saldo')
+    # Obtén todos los documentos de la colección Saldo
+    saldo_ref=saldo_ref.where("id_usuario","==",(id))
+    documentos_saldo = saldo_ref.stream()
+    # Crear un diccionario para almacenar las sumas por id
+    sumas_por_id = {}
+    # Iterar sobre los documentos de Saldo
+    for doc in documentos_saldo:
+        # Obtener datos del documento Saldo
+        datos_saldo = doc.to_dict()  
+        monto = int(datos_saldo.get('saldo', 0))
+        motivo = (datos_saldo.get('motivo', "??"))
+        # Sumar el monto al total para el id de usuario correspondiente
+        sumas_por_id[motivo] = sumas_por_id.get(motivo, 0) + monto
+    return sumas_por_id

@@ -155,4 +155,6 @@ def ma_botones(cual):
         return "+pasar"
     if(cual=="recargar"):
         return "+add"
+    if(cual=="apartado"):
+        return "Apartado de Tareas"
     return "._."

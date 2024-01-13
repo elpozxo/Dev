@@ -1032,6 +1032,160 @@ def BotRefe(client,bot,ref):
 ################################################################3
 ################################################################3
 ################################################################3
+async def EjecutarTaarea(el_text,cuentas,principal,ini=0,fin=100000,por=0):
+    ##-1 no conexion cliente no autorizado
+    ##0 un error en lo que debe hacer
+    contador=0 
+    for cuenta in cuentas:
+        if ini==fin:
+            return 1,errores,contador
+        if contador>=por:
+            ini+=1 ##solo para saber en cuanta se ejecutara
+            phone_number = cuenta.get("numero") 
+        
+            client = TelegramClient("session/" + phone_number, api_id, api_hash)
+            await client.connect()
+            if not await client.is_user_authorized(): 
+                return -1,cuenta.get("numero"),contador
+            errores="_"
+            bot=""
+            ref=""
+            for x in el_text:  
+                if x.startswith("unirser"):
+                    canales=x[8:].split(",")
+                    l=[]
+                    for canal in canales: 
+                        if canal[0]=="@":
+                            l.append(canal[1:])
+                        if canal.startswith("http"):
+                            l.append(canal.split("t.me/")[1])
+                    for canal in l:
+                        try:
+                            await unirseCanal(client, canal)
+                        except:
+                            errores+=f"{phone_number} no se pudo unir a {canal}\n"
+                
+                if x.startswith("unirserPriv"):
+                    canales=x[12:].split(",")
+                    l=[]
+                    for canal in canales: 
+                        if canal[0]=="@":
+                            l.append(canal[2:])
+                        if canal[0]=="1":
+                            l.append(canal[1:])
+                        if canal.startswith("http"):
+                            l.append(canal.split("t.me/+")[1])
+                    
+                    for canal in l:
+                        try:
+                            await unirsecanalPriv(client, canal)
+                        except:
+                            errores+=f"{phone_number} no se pudo unir ap {canal}\n"
+            
+                if x.startswith("mensaje"):
+                    f="" 
+                    try:
+                        if x[8]=="@":
+                            patron = r'@(\w+)'
+                            coincidencias = re.findall(patron, x)  
+                            canal="@"+coincidencias[0] 
+                            mensaje=x.split(canal)[1] 
+                            await MensajePlano(mensaje, canal,client)
+                        else:
+                            await MensajePlano(x[7:],bot,client)
+                    except:
+                        errores+=f"{phone_number}no se puedo enviar mensaje\n"
+
+                if x.startswith("ini"):
+                    try:
+                        ini=int(x[4:])
+                    except:
+                        errores+=f"El inicio no fue cambiado {x[4:]}\n"
+                if x.startswith("fin"):
+                    try:
+                        fin=int(x[4:])
+                    except:
+                        errores+=f"El fin no fue cambiado {x[4:]}\n"
+                if x.startswith("por"):
+                    try:
+                        por=int(x[4:])
+                    except:
+                        errores+=f"El por no fue cambiado {x[4:]}\n"
+            
+                if x.startswith("desbloquiar"):
+                    canales=x[12:].split(",")
+                    l=[]
+                    for canal in canales: 
+                        if canal[0]=="@":
+                            l.append(canal[1:])
+                        if canal.startswith("http"):
+                            l.append(canal.split("t.me/")[1])
+                    for canal in l:
+                        try:
+                            await desbloquiar(client, canal)
+                        except:
+                            errores+=f"{phone_number} no se pudo desbloquiar a {canal}\n"
+               
+                if x.startswith("botRef"):
+                    link=x.split("?")
+                    bot=link[0].split("t.me/")[1]
+                    ref=link[1].split("=")[1]
+                if x.startswith("bot"): 
+                    bot=x[5:]
+                if x.startswith("Ref"): 
+                    ref=x[4:]
+                
+                if x.startswith("envia"): 
+                    cual=x.split(" ")
+                    if(len(cual)==1):
+                        mensaje=await UltimoMensaje(client,bot)
+                        mensaje=mensaje.messages[0].message
+                    else:
+                        try:
+                            cual=int(cual[1])
+                        except:
+                            errores+=f"al #enviar debe ser un numero\n"
+                            cual=0
+                        id_mns=await UltimoMensaje(client,bot)
+                        id_mns=id_mns.messages[0].id
+                        mensaje=await buscarMensaje(client,bot,id_mns-cual)
+                        mensaje=mensaje.messages[0].message
+                    await MensajePlano(mensaje,bot,client)
+                
+                if x.startswith("renvia"): 
+                    cual=x.split(" ")
+                    if(len(cual)==1):
+                        mensaje=await UltimoMensaje(client,bot) 
+                        mensaje=mensaje.messages[0].message
+                    else:
+                        try:
+                            cual=int(cual[1])
+                        except:
+                            errores+=f"al #enviar debe ser un numero\n"
+                            cual=0
+                        id_mns=await UltimoMensaje(client,bot)
+                        id_mns=id_mns.messages[0].id
+                        mensaje=await buscarMensaje(client,bot,id_mns-cual)                        
+                        mensaje=mensaje.messages[0].message
+                    await MensajePlano(mensaje,principal.grupo,client)
+
+                if x.startswith("esperar"): 
+                    cual=x.split(" ")
+                    if(len(cual)==1):
+                        errores+=f"al #esperar debe ser un numero\n"
+                        sleep(2)
+                    else:
+                        try:
+                            v=int(cual[1])
+                        except:
+                            errores+=f"al #esperar debe ser un numero\n"
+                            v=2
+                        sleep(v)
+            
+            await client.disconnect()
+        contador+=1
+    return 0,errores,contador
+    
 
 async def validarcuenta(phone_number,canales): 
     ##-1 cuenta sin activar
