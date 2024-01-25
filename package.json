@@ -1,6 +1,7 @@
 {
   "scripts": {
     "start": "nodemon --exec python index.py",
+    "micasino": "nodemon --exec python micasino.py",
     "start:prod": "python index.py",
     "inss": "pip install -r requirements.txt"
   }

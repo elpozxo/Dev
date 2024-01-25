@@ -153,13 +153,14 @@ def obtener_referidos(id_usuario):
 def obtener_iduser(arroba): 
     principales_ref = firestore.client().collection("Usuarios")
     # Realizar la consulta para el usuario específico
-    consulta = principales_ref.where(field_path='user', op_string='==',value= arroba).limit(1).stream()
+    consulta = principales_ref.where('user','==', arroba).limit(1).stream()
     # Verificar si se encontró algún resultado
     for usuario in consulta:
-        datos_usuario = usuario.to_dict()
+        datos_usuario = usuario.to_dict() 
         # Verificar si el resultado tiene la clave 'user_id'
         if 'user_id' in datos_usuario:
             return datos_usuario['user_id']
+    return None
         
 def obtener_arroba(iduser): 
     principales_ref = firestore.client().collection("Usuarios")
@@ -223,3 +224,11 @@ def bd_obtener_saldo_staking_user(id_user):
         .where(field_path='estado',op_string= '==',value= True)    
     return sum([doc.to_dict()['monto'] for doc in saldo_total_query.get()])
 
+def xxx(): 
+    consulta =firestore.client().collection('Usuarios').stream()
+    for documento in consulta:
+        # Obtener el valor actual del campo 'user'
+        user_actual = documento.get('user')
+        # Convertir el valor a minúsculas y actualizar en la base de datos
+        user_minusculas = user_actual.lower() 
+        documento.reference.update({'user': user_minusculas})

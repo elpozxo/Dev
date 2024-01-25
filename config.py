@@ -1,4 +1,5 @@
 MAIN_BOT_TOKEN = "6969295559:AAHMOkVFYyojgcasXzNXKAsaecH3lTPI34c"
+MAIN_BOT_TOKEN2 = "6745605891:AAFFdJCjhpz7mYoqVepKLQU9-ZFAP1SWw7g"
 arroba="mult1sbot"
 nombre_mi_token="token"
 grupoPago="@multitransaciones"
