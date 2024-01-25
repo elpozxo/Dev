@@ -1,6 +1,8 @@
 MAIN_BOT_TOKEN = "6969295559:AAHMOkVFYyojgcasXzNXKAsaecH3lTPI34c"
 arroba="mult1sbot"
 nombre_mi_token="token"
+grupoPago="@multitransaciones"
+apiStaking=3
 #arroba="multicuentabobot"
 WEBHOOK_HOST = "your_domain.com"
 WEBHOOK_PATH = "telegram_webhook"

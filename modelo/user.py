@@ -55,7 +55,12 @@ class Saldo:
             saldo_actual=data['saldo_actual'],
             fecha_actualizacion=data['fecha_actualizacion']
         )
-
+class Staking:
+    def __init__(self, id_user, monto, fecha_inicio, estado=True):
+        self.id_user = id_user
+        self.monto = monto
+        self.fecha_inicio = fecha_inicio
+        self.estado = estado
 
 def validate(texto):
     if texto is None :

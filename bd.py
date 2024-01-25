@@ -2,10 +2,12 @@
 
 import firebase_admin,json
 from firebase_admin import credentials, firestore
-
+import warnings 
 
 def inicializar_firebase():
     # Configura las credenciales de Firebase
+    
+    warnings.simplefilter("ignore", category=UserWarning)
     cred = credentials.Certificate("db.json")
     firebase_admin.initialize_app(cred) 
 
@@ -27,13 +29,9 @@ def obtener_informacion(coleccion, id):
 def cambiar_estado_cuenta(colecion,id,nombre_dato,dato):
     # Referencia a la colección "Cuentas" en Firestore
     coleccion_cuentas = firestore.client().collection(colecion)
-
-    # Obtener la referencia al documento de la cuenta
     cuenta_ref = coleccion_cuentas.document(id)
-
     # Actualizar el campo "estado" con el nuevo valor
-    cuenta_ref.update({nombre_dato: dato})
-    
+    cuenta_ref.update({nombre_dato: dato})    
     return cuenta_ref.get().to_dict()
         
 def obtener_ids():
@@ -60,14 +58,16 @@ def saber_admin( id):
 
 def bd_obtener_id_users_principales():
     # Obtener la lista de id_user de principale con disponible en True
-    principales_query =firestore.client().collection('Principal').where('disponible', '==', True)
+    principales_query =firestore.client().collection('Principal').where(field_path='disponible', op_string='==', value=True)
     return [doc.to_dict()['id_user'] for doc in principales_query.get()]
 
 def bd_contar_disponibles(id_users_principales):
     # Contar en la tabla cuenta cuántos id_user coinciden con la lista obtenida
     if(len(id_users_principales)==0):
         return  0
-    cuenta_query = firestore.client().collection('Cuentas').where('id_usuario', 'in', id_users_principales).where('activo','==',True)   
+    cuenta_query = firestore.client().collection('Cuentas')\
+        .where(field_path='id_usuario',op_string= 'in',value= id_users_principales)\
+        .where(field_path='activo',op_string='==',value=True)   
     # Obtener los documentos y contar la cantidad
     cuenta_resultados = cuenta_query.get()
     cantidad_disponibles = len(cuenta_resultados)
@@ -80,17 +80,16 @@ def bd_obtener_saldo_total():
 
 def bd_obtener_saldo_total_user(id_user):
     # Obtener el total de monto en la tabla saldo
-    saldo_total_query =firestore.client().collection('Saldo').where('id_usuario', '==', id_user)    
+    saldo_total_query =firestore.client().collection('Saldo')\
+        .where(field_path='id_usuario',op_string= '==', value=id_user)    
     return sum([doc.to_dict()['saldo'] for doc in saldo_total_query.get()])
 
 def bd_obtener_hash_id(usuario_id):
     # Obtener una referencia a la colección "principal"
     principales_ref = firestore.client().collection("Principal")
-
     # Realizar la consulta para el usuario_id específico
-    consulta = principales_ref.where("id_user", "==", usuario_id)
+    consulta = principales_ref.where(field_path="id_user", op_string="==", value=usuario_id)
     resultados = consulta.get()
-
     # Verificar si se encontró algún resultado
     if resultados:
         for doc in resultados:
@@ -106,11 +105,9 @@ def bd_obtener_hash_id(usuario_id):
 def bd_obtener_hash(usuario_id):
     # Obtener una referencia a la colección "principal"
     principales_ref = firestore.client().collection("Principal")
-
-    # Realizar la consulta para el usuario_id específico
-    consulta = principales_ref.where("id_user", "==", usuario_id)
+    # Realizar la consulta para el usuario_id específico    
+    consulta = principales_ref.where(field_path="id_user",op_string="==", value=usuario_id)
     resultados = consulta.get()
-
     # Verificar si se encontró algún resultado
     if resultados:
         for doc in resultados:
@@ -126,8 +123,7 @@ def bd_obtener_hash(usuario_id):
 def obtener_cuentas_paginadas(id_usuario, n=5, l=0):
     db = firestore.client().collection('Cuentas')
     # Realizar la consulta
-    cuenta_query = db \
-        .where('id_usuario', '==', id_usuario)  
+    cuenta_query = db.where(field_path='id_usuario',op_string='==',value= id_usuario)  
     # Obtener los documentos
     cuentas = cuenta_query.stream() 
     # Crear una lista de resultados
@@ -151,23 +147,24 @@ def obtener_cuentas_paginadas(id_usuario, n=5, l=0):
 def obtener_referidos(id_usuario):    
     principales_ref = firestore.client().collection("Usuarios")
     # Realizar la consulta para el usuario_id específico
-    consulta = principales_ref.where('ref_id', '==', str(id_usuario))
+    consulta = principales_ref.where(field_path='ref_id',op_string= '==',value= str(id_usuario))
     return consulta.stream() 
 
 def obtener_iduser(arroba): 
     principales_ref = firestore.client().collection("Usuarios")
     # Realizar la consulta para el usuario específico
-    consulta = principales_ref.where('user', '==', arroba).limit(1).stream()
+    consulta = principales_ref.where(field_path='user', op_string='==',value= arroba).limit(1).stream()
     # Verificar si se encontró algún resultado
     for usuario in consulta:
         datos_usuario = usuario.to_dict()
         # Verificar si el resultado tiene la clave 'user_id'
         if 'user_id' in datos_usuario:
             return datos_usuario['user_id']
+        
 def obtener_arroba(iduser): 
     principales_ref = firestore.client().collection("Usuarios")
     # Realizar la consulta para el usuario específico
-    consulta = principales_ref.where('user_id', '==', iduser).limit(1).stream()
+    consulta = principales_ref.where(field_path='user_id', op_string='==',value= iduser).limit(1).stream()
     # Verificar si se encontró algún resultado
     for usuario in consulta:
         datos_usuario = usuario.to_dict()
@@ -196,7 +193,7 @@ def obtener_saldos_id_agrupados(id):
     # Obtén una referencia a la colección Saldo
     saldo_ref = firestore.client().collection('Saldo')
     # Obtén todos los documentos de la colección Saldo
-    saldo_ref=saldo_ref.where("id_usuario","==",(id))
+    saldo_ref=saldo_ref.where(field_path="id_usuario",op_string="==",value=(id))
     documentos_saldo = saldo_ref.stream()
     # Crear un diccionario para almacenar las sumas por id
     sumas_por_id = {}
@@ -209,3 +206,20 @@ def obtener_saldos_id_agrupados(id):
         # Sumar el monto al total para el id de usuario correspondiente
         sumas_por_id[motivo] = sumas_por_id.get(motivo, 0) + monto
     return sumas_por_id
+
+def bd_obtener_staking(id_user):
+    # Obtener el staking con estado True en la tabla Staking
+    saldo_total_query = firestore.client().collection('Staking')\
+        .where(field_path='id_user',op_string= '==',value= id_user)\
+        .where(field_path='estado',op_string= '==',value= True).limit(1).get()
+    if saldo_total_query:    
+        return saldo_total_query[0].to_dict()     
+    return None
+
+def bd_obtener_saldo_staking_user(id_user):
+    # Obtener el total de monto en la tabla saldo
+    saldo_total_query =firestore.client().collection('Staking')\
+        .where(field_path='id_user',op_string= '==',value= id_user)\
+        .where(field_path='estado',op_string= '==',value= True)    
+    return sum([doc.to_dict()['monto'] for doc in saldo_total_query.get()])
+
