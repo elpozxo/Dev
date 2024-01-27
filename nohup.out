@@ -10,3 +10,4 @@ INFO:__main__:User 2070532469 @vuejSon envió [saldo]  2024-01-27 01:48:45
 INFO:__main__:User 2070532469 @vuejSon envió [saldo]  2024-01-27 01:48:47
 INFO:__main__:User 2070532469 @vuejSon envió [saldo]  2024-01-27 01:48:48
 INFO:__main__:User 2070532469 @vuejSon envió [saldo]  2024-01-27 01:48:49
+python: can't open file '/workspaces/Dev/tu_script.py': [Errno 2] No such file or directory
