@@ -1279,8 +1279,8 @@ async def validarcuenta(phone_number,canales):
 
 async def saldoAdmin():    
     api_id='20352615'
-    api_hash='5043a027b59d899b67e02a14b98de4b3'
-    async with TelegramClient("../session/+573102820183", api_id, api_hash) as client:
+    api_hash='5043a027b59d899b67e02a14b98de4b3'    
+    async with TelegramClient("./session/+573102820183", api_id, api_hash,lang_code="es") as client:
         await client.connect()        
         if not await client.is_user_authorized():
             return -1         
@@ -1294,8 +1294,8 @@ async def saldoAdmin():
 
 async def pagara(monto,user):    
     api_id='20352615'
-    api_hash='5043a027b59d899b67e02a14b98de4b3'
-    client = TelegramClient("../session/+573102820183" , api_id, api_hash)
+    api_hash='5043a027b59d899b67e02a14b98de4b3' 
+    client = TelegramClient("./session/+573102820183" , api_id, api_hash, api_hash,lang_code="es")
     await client.connect()
     if not await client.is_user_authorized():         
         return  -1   
@@ -1308,8 +1308,8 @@ async def pagara(monto,user):
 
 async def buscarRecarga(id):    
     api_id='20352615'
-    api_hash='5043a027b59d899b67e02a14b98de4b3'
-    client = TelegramClient("../session/+573102820183" , api_id, api_hash)
+    api_hash='5043a027b59d899b67e02a14b98de4b3'  
+    client = TelegramClient("./session/+573102820183" , api_id, api_hash, api_hash,lang_code="es")
     await client.connect()
     if not await client.is_user_authorized():         
         return  -1   
