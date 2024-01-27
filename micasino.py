@@ -102,7 +102,7 @@ def enviar_mensaje(lista_ids, mensaje):
         except Exception as e:
             # Manejar otras excepciones no previstas
             print(f"{ma_error_mensaje()} enviar_mensaje {usuario_id} ")
-    return mens.message_id
+    return mens
 
 def responder_mensaje(lista_ids, mensaje,a):
     for usuario_id in lista_ids:
@@ -110,7 +110,7 @@ def responder_mensaje(lista_ids, mensaje,a):
             mens=main_bot.send_message(usuario_id, mensaje,reply_to_message_id=a)    
         except  : 
             print(f"{ma_error_mensaje()} responder_mensaje {usuario_id} ")
-    return mens.message_id
+    return mens
 
 def renviar_mensaje(a_id,de_id,mensaje_id):
     try:
@@ -192,10 +192,7 @@ def botonesInicio(id):
             ] 
         )
     )
-
- 
- 
- 
+  
 @app.route(f"/{config.WEBHOOK_PATH}/<token>", methods=['POST']) #telegram_webhook
 def webhook(token: str):
     if not tokens.get(token):
@@ -476,7 +473,7 @@ def AgregarAcc(id_user):
     minutos=5
     threading.Timer(minutos*60, cerrar_alerta_auto, args=[mensaje.chat.id,mensaje]).start()
 
-@main_bot.message_handler(func=lambda message: message.text in ['/idioma']  and message.chat.type == 'private')
+@main_bot.message_handler(func=lambda message: message.text in ['/idioma'] )
 def handle_AgregarAcc(message: types.Message):   
     ma_cambiar_idioma(message.from_user.language_code)
     enviar_mensaje([message.chat.id],message.from_user.language_code)
@@ -727,83 +724,6 @@ def handle_AgregarAcc(message: types.Message):
         l +=f"[{na}]({enlace_perfil}) => {fecha}\n"  
     enviar_mensaje_parse([id_user],ma_msj_ref(id_user,l)) 
 
-@main_bot.message_handler(func=lambda message: message.text.startswith(ma_botones("pasar")))
-def handle_Info(message: types.Message):    
-    ma_cambiar_idioma(message.from_user.language_code)
-    id_user=message.from_user.id     
-    id_chat=message.chat.id   
-    mns=message.message_id
-    user_info=message.from_user
-    logger.info(f"User {user_info.id} @{user_info.username} envió [pasar]  "+horatodo()) 
-    text=(message.text.split(ma_botones("pasar"))[1].strip())  
-    saldo=0
-    try:
-        saldo=int(bd_obtener_saldo_total_user(id_user) )
-    except:
-        f=1
-    # Verificar si el mensaje es una respuesta a otro mensaje
-    if message.reply_to_message:
-        id_usuario_destino = message.reply_to_message.from_user.id
-        el_text=text.split(" ")
-        if(id_usuario_destino==id_user):
-            return responder_mensaje([id_chat],ma_pasar_yo(),mns)
-        if(len(el_text)==1): 
-            try:
-                cuanto=int(el_text[0])
-            except:
-                return enviar_alerta(id_chat,ma_pasar_sobre())
-            if(cuanto<1):
-                if not es_admin(id_user):
-                    return enviar_alerta(id_chat,ma_pasar_sobre())
-
-            if saldo>=cuanto:
-                saldo_para=Saldo(id_usuario_destino,cuanto,horatodo(),"Pasar_recibe")
-                saldo_de=Saldo(id_user,-cuanto,horatodo(),"Pasar_envia")
-                guardar_informacion("Saldo",f"pasa_envia_{id_user}={get_fecha()}{get_hora()}",saldo_de)
-                guardar_informacion("Saldo",f"pasa_recive_{id_usuario_destino}={get_fecha()}{get_hora()}",saldo_para)
-                quien=message.from_user.username
-                if(quien==None):
-                    quien=message.from_user.first_name
-                para=message.reply_to_message.from_user.username
-                if(para==None):
-                    para=message.reply_to_message.from_user.first_name
-                enviar_mensaje([id_chat],ma_tepaso_saldo(quien,para,cuanto))
-            else:
-                responder_mensaje([id_chat],ma_no_tienestanto(),mns)
-        else:
-            enviar_alerta(id_chat,ma_pasar_sobre())
-    else:
-        el_text=text.split(" ")
-        if(len(el_text)==2): 
-            cuanto=0
-            para=el_text[1][1:].lower()
-            id_para=(obtener_iduser(para))      
-            if(id_para==None):
-                return responder_mensaje([id_chat],ma_pasar_yo(),mns)
-            if(id_para==id_user):
-                return responder_mensaje([id_chat],ma_pasar_yo(),mns)
-            try:
-                cuanto=int(el_text[0])                
-            except:
-                return enviar_alerta(id_chat,ma_pasar_user())
-            
-            if(cuanto<1):
-                if not es_admin(id_user):
-                    return enviar_alerta(id_chat,ma_pasar_sobre())
-            if saldo>=cuanto:
-                saldo_para=Saldo(id_para,cuanto,horatodo(),"Pasar_recibe")
-                saldo_de=Saldo(id_user,-cuanto,horatodo(),"Pasar_envia")
-                guardar_informacion("Saldo",f"pasa_envia_{id_user}={get_fecha()}{get_hora()}",saldo_de)
-                guardar_informacion("Saldo",f"pasa_recive_{id_para}={get_fecha()}{get_hora()}",saldo_para)
-                quien=message.from_user.username
-                if(quien==None):
-                    quien=message.from_user.first_name 
-                enviar_mensaje([id_chat],ma_tepaso_saldo(quien,para,cuanto))
-            else:
-                responder_mensaje([id_chat],ma_no_tienestanto(),mns)
-        else: 
-            enviar_alerta(id_chat,ma_pasar_user())
-
 @main_bot.message_handler(func=lambda message: message.text.startswith("+add") and message.chat.type == 'private')
 def handle_Info(message: types.Message):    
     ma_cambiar_idioma(message.from_user.language_code)
@@ -855,6 +775,7 @@ def handle_Info(message: types.Message):
         if user==None:
             user=message.from_user.first_name
         verSaldo(id_user,id_chat,user,message.message_id,True)
+
 @main_bot.message_handler(func=lambda message: message.text=="TLsaldo" and message.chat.type == 'private')
 def handle_Info(message: types.Message):   
     ma_cambiar_idioma(message.from_user.language_code) 
@@ -905,7 +826,6 @@ def handle_Info(message: types.Message):
     mns=message.message_id    
     enviar_mensaje_parse([id_chat],ma_maxExplicacion_tarea()
 ,"HTML")
-
  
 @main_bot.message_handler(func=lambda message: (message.text in ma_botones("atras") or message.text =="/atras") and message.chat.type == 'private')
 def handle_Info(message: types.Message):  
@@ -915,7 +835,6 @@ def handle_Info(message: types.Message):
     mns=message.message_id 
     botonesInicio(id_user)
 
- 
 ##Comando defaul
 @main_bot.message_handler(func=lambda message: True and message.chat.type == 'private')
 def handle_default(message: types.Message): 
@@ -984,8 +903,7 @@ def handle_default(message: types.Message):
             monto=int(message.text)
         except:
             return enviar_mensaje([message.from_user.id],"Debe ser un Entero")        
-        guardarStaking(id_user,monto)  
-
+        guardarStaking(id_user,monto)
     else:  
         enviar_mensaje([message.chat.id],"Lo siento, no entiendo ese comando.")        
         logger.info(f"User {message.from_user.id} @{message.from_user.username} envió [no] {message.text}"+horatodo())
@@ -1016,38 +934,27 @@ def handle_photo(message):
             # Si el mensaje es de otro tipo, responder con un mensaje genérico
             main_bot.send_message(id_new, "Recibí un mensaje de un tipo diferente."+message.content_type)
 
-@main_bot.message_handler(func=lambda message: True and message.chat.type == 'supergroup')
-def handle_default(message: types.Message):  
-    ma_cambiar_idioma(message.from_user.language_code)
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    if(message.chat.username=="multitransaciones"): 
-        m=message.text 
-        if(("Cc" in m or "cc" in m) and "vuejson" in m.lower()):  
-            sleep(2)
-            x = loop.run_until_complete(buscarRecarga(message.id)) 
-
+ 
 @main_bot.message_handler(func=lambda message: True if message.new_chat_members else False, content_types=['new_chat_members'])
 def handle_default(message):
     # Verificar si el bot es uno de los nuevos miembros
     bot_id = main_bot.get_me().id
-    new_members = message.new_chat_members  
+    new_members = message.new_chat_members 
+ 
+
     if any(member.id == bot_id for member in new_members):
         # El bot fue añadido al supergrupo
         chat_id = message.chat.id        
         group_username = message.chat.username
-        
+                
         if not group_username:            
             main_bot.send_message(chat_id, 'Solo Puedo en grupos Publico!')            
             main_bot.leave_chat(chat_id)
         else:
             main_bot.send_message(chat_id, '¡Gracias por añadirme!')
 
-        #participants_count = int(main_bot.get_chat_members_count(chat_id))
-        # if participants_count>100:
-        #     main_bot.send_message(chat_id, f'Juega /casino')
-     
-
+    
+    
 def main():
     while True:
         try:

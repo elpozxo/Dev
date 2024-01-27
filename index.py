@@ -15,7 +15,6 @@ import math
 inicializar_firebase()
 
 
-
 app = Flask(__name__)
 main_bot = TeleBot(config.MAIN_BOT_TOKEN)
 tokens = {config.MAIN_BOT_TOKEN: True}
@@ -102,7 +101,7 @@ def enviar_mensaje(lista_ids, mensaje):
         except Exception as e:
             # Manejar otras excepciones no previstas
             print(f"{ma_error_mensaje()} enviar_mensaje {usuario_id} ")
-    return mens.message_id
+    return mens
 
 def responder_mensaje(lista_ids, mensaje,a):
     for usuario_id in lista_ids:
@@ -110,7 +109,7 @@ def responder_mensaje(lista_ids, mensaje,a):
             mens=main_bot.send_message(usuario_id, mensaje,reply_to_message_id=a)    
         except  : 
             print(f"{ma_error_mensaje()} responder_mensaje {usuario_id} ")
-    return mens.message_id
+    return mens
 
 def renviar_mensaje(a_id,de_id,mensaje_id):
     try:
@@ -118,7 +117,7 @@ def renviar_mensaje(a_id,de_id,mensaje_id):
     except Exception as e:
         # Manejar otras excepciones no previstas
         print(f"{ma_error_mensaje()} renviar_mensaje {a_id}")
-    return mens.message_id
+    return mens
 
 def enviar_mensaje_parse(lista_ids, mensa,parse="Markdown"):
     mensaje=0
@@ -143,7 +142,7 @@ def enviar_mensaje_flotante(lista_ids, mens,boton,parse="Markdown",responder=0):
             # Manejar otras excepciones no previstas
             print(f"{ma_error_mensaje()} enviar_mensaje_flotante {usuario_id} ")
             return False
-    return mensaje.message_id
+    return mensaje
 
 def enviar_alerta(usuario_id, mensaje,parse_mode="NO",minutos=3):
     # Crear un mensaje con teclado en línea vacío

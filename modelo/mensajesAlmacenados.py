@@ -826,7 +826,7 @@ def ma_botones(cual):
             "Ganar": "💸 Earn",
             "Info": "🚏 Info",
             "lista_cuanta": "List Accounts",
-            "pasar": "+transfer",
+            "pasar": "+pasar",
             "recarga": "🧑‍🎤 Reload",
             "ref": "🖇 Referrals",
             "reclamar_staking": "🍾 Claim",
