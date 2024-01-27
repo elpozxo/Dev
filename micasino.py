@@ -1065,5 +1065,5 @@ def nomain():
     main_bot.delete_webhook()
     main_bot.polling(timeout=10)
 if __name__ == '__main__':
-    #main()
-    nomain()
+    main()
+    #nomain()
