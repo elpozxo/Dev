@@ -1,10 +1,7 @@
 # Ignorar la carpeta 'session'
-session/*
+
 __pycache__/*
 modelo/__pycache__/*
 
 # Ignorar archivos con extensión '.txt'
 *.txt
-
-
-!session/+573102820183.session
