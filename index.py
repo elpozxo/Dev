@@ -128,6 +128,7 @@ def enviar_mensaje_parse(lista_ids, mensa,parse="Markdown"):
         except Exception as e:
             # Manejar otras excepciones no previstas
             print(f"{ma_error_mensaje} enviar_mensaje_parse {usuario_id}")
+            print(mensa)
     return mensaje
     
 def enviar_mensaje_flotante(lista_ids, mens,boton,parse="Markdown",responder=0): 
@@ -623,7 +624,7 @@ def lanzar_dado(chat_id,responder):
         enviar_mensaje([chat_id], f"{ma_tg_no_play()}")
     return 0
 
-@main_bot.message_handler(func=lambda message: message.text in ['/Casino','/casino',ma_botones("Casino")])#incompleto
+@main_bot.message_handler(func=lambda message: message.text in ['/Casino','/casino','/casino@Mult1sbot',ma_botones("Casino")])#incompleto
 def handle_Info(message: types.Message):    
     ma_cambiar_idioma(message.from_user.language_code)
     id_user=message.from_user.id     
@@ -1040,14 +1041,14 @@ def verSaldo(id_user,chat,quien,sobre,privado):
         saldo=int(bd_obtener_saldo_total_user(id_user) )
     except: 
         f=1
-    if not privado:
-        return enviar_mensaje_parse([chat],ma_verSaldo(saldo,quien)[:-29],"HTML")
+    if not privado: 
+        return enviar_mensaje_parse([chat],ma_verSaldo(saldo,quien).split("</pre>")[0]+"</pre>","HTML")
     if saldo>0:  
         enviar_mensaje_flotante([chat],ma_verSaldo(saldo,quien),btf_retirar(id_user),"HTML",sobre)
     else:
         enviar_mensaje_flotante([chat],ma_verSaldo(saldo,quien),btf_depositar(id_user),"HTML",sobre)
 
-@main_bot.message_handler(func=lambda message: message.text in ['/saldo','Saldo',ma_botones("Saldo")] )
+@main_bot.message_handler(func=lambda message: message.text in ['/saldo','Saldo','/saldo@Mult1sbot',ma_botones("Saldo")] )
 def handle_AgregarAcc(message: types.Message): 
     ma_cambiar_idioma(message.from_user.language_code)  
     id_user=message.from_user.id     

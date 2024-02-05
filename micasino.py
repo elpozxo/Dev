@@ -339,7 +339,7 @@ def handle_Info(message: types.Message):
         f=1    
     logger.info(f"User {user_info.id} @{user_info.username} envió [dadoA] {saldo} "+horatodo()) 
 
-@main_bot.message_handler(func=lambda message: message.text in  ['/dado_p','/dado_P','/dado_p@Mult1sbot'])
+@main_bot.message_handler(func=lambda message: message.text in  ['/dado_p','/dado_P','/dado_p@micasinoBot'])
 def handle_Info(message: types.Message):  
     ma_cambiar_idioma(message.from_user.language_code)  
     id_user=message.from_user.id     
@@ -383,7 +383,7 @@ def handle_Info(message: types.Message):
         f=1
     logger.info(f"User {user_info.id} @{user_info.username} envió [dadoP] {saldo} "+horatodo()) 
 
-@main_bot.message_handler(func=lambda message: message.text in  ['/dado_i','/dado_I','/dado_i@Mult1sbot'])
+@main_bot.message_handler(func=lambda message: message.text in  ['/dado_i','/dado_I','/dado_i@micasinoBot'])
 def handle_Info(message: types.Message):   
     ma_cambiar_idioma(message.from_user.language_code) 
     id_user=message.from_user.id     
@@ -455,7 +455,24 @@ def handle_Info(message: types.Message):
     else:
         enviar_mensaje_parse([id_chat], ma_texto_de_apuesta(monto_user_id),"HTML")
     logger.info(f"User {message.from_user.id} envió /casino "+horatodo())
- 
+
+def AgregarAcc(id_user):
+    mensaje=0
+    hash_id=bd_obtener_hash_id(id_user) 
+    if(hash_id in [-1,0]):  
+        mensaje=main_bot.send_message(id_user, ma_falta_hash(),parse_mode='Markdown',reply_markup=btf_apihash_nuevo(id_user))
+    else:         
+        p = Principal()
+        p=cargarPrincipal(obtener_informacion("Principal", id_user))
+        mensaje=main_bot.send_message(
+            id_user,  
+            ma_no_falta_hash(p.api_id,p.api_hash,p.grupo,p.disponible),
+            parse_mode='HTML',
+            reply_markup=btf_apihash(id_user)
+        )
+    minutos=5
+    threading.Timer(minutos*60, cerrar_alerta_auto, args=[mensaje.chat.id,mensaje]).start()
+
 @main_bot.message_handler(func=lambda message: message.text in ['/idioma'] )
 def handle_AgregarAcc(message: types.Message):   
     ma_cambiar_idioma(message.from_user.language_code)
@@ -818,7 +835,82 @@ def handle_Info(message: types.Message):
     mns=message.message_id 
     botonesInicio(id_user)
 
-   
+##Comando defaul
+@main_bot.message_handler(func=lambda message: True and message.chat.type == 'private')
+def handle_default(message: types.Message): 
+    ma_cambiar_idioma(message.from_user.language_code)
+    id_user=message.from_user.id
+    if message.from_user.id in lista_hashid_input:
+        if message.text.isdigit(): 
+            p = Principal()
+            p=cargarPrincipal(obtener_informacion("Principal",message.chat.id))
+            p.api_id=message.text
+            p.id_user=message.from_user.id
+            guardar_informacion("Principal",message.from_user.id,p)  
+            AgregarAcc(message.chat.id)
+            logger.info(f"User {message.from_user.id} envió [hash_id] {message.text}"+horatodo())
+            lista_hashid_input.remove(p.id_user)
+    elif message.from_user.id in lista_hash_input:              
+        p = Principal()
+        p=cargarPrincipal(obtener_informacion("Principal", message.from_user.id))  
+        p.api_hash=message.text
+        p.id_user=message.from_user.id
+        guardar_informacion("Principal",message.from_user.id,p)  
+        AgregarAcc(message.chat.id)
+        logger.info(f"User {message.from_user.id} envió [api_hash] {message.text}"+horatodo())
+        lista_hash_input.remove(p.id_user)
+    elif message.from_user.id in lista_grupo_input:              
+        p = Principal()
+        p=cargarPrincipal(obtener_informacion("Principal", message.from_user.id))  
+        p.grupo=message.text
+        p.id_user=message.from_user.id
+        guardar_informacion("Principal",message.from_user.id,p)  
+        AgregarAcc(message.chat.id)
+        logger.info(f"User {message.from_user.id} envió [grupo] {message.text}"+horatodo())
+        lista_grupo_input.remove(p.id_user)     
+    elif message.from_user.id in lista_addnumero_input:              
+        c= Cuenta()
+        c.id_usuario=message.chat.id 
+        c.fecha=horatodo()
+        c.numero=message.text 
+        guardar_informacion("Cuentas",str(message.chat.id)+message.text ,c)
+        agrego_new_numero(message.text,message.chat.id)
+        logger.info(f"User {message.from_user.id} envió [new#] {message.text}"+horatodo()) 
+        lista_addnumero_input.remove(message.chat.id)    
+    elif message.from_user.id in lista_addnumerocodigo_input2:
+        global lista_addnumerocodigo_input
+        for cuenta in lista_addnumerocodigo_input: 
+            if(cuenta.id_usuario == message.from_user.id):
+                agrego_new_numero2(message.text,cuenta.numero ,message.chat.id)     
+                lista_addnumerocodigo_input2.remove(message.from_user.id) 
+                lista_addnumerocodigo_input = [cuenta for cuenta in lista_addnumerocodigo_input if cuenta.id_usuario != message.from_user.id]
+    elif message.from_user.id in lista_retiro_input:      
+        lista_retiro_input.remove(message.from_user.id) 
+        escribiRetirar(message.text,message.from_user.id,message)
+    elif message.from_user.id in lista_montoApuesta_input:      
+        lista_montoApuesta_input.remove(message.from_user.id) 
+        monto=0
+        try:
+            monto=int(message.text)
+        except:
+            return enviar_mensaje([message.from_user.id],"Debe ser un Entero") 
+        cambiar_estado_cuenta("Usuarios",str(message.from_user.id),"MontoApuesta",monto)        
+        mensaje=enviar_mensaje([message.from_user.id],f"Se establecio {monto}") 
+    elif message.from_user.id in lista_staking_input:      
+        lista_staking_input.remove(message.from_user.id) 
+        monto=0
+        try:
+            monto=int(message.text)
+        except:
+            return enviar_mensaje([message.from_user.id],"Debe ser un Entero")        
+        guardarStaking(id_user,monto)
+    else:  
+        enviar_mensaje([message.chat.id],"Lo siento, no entiendo ese comando.")        
+        logger.info(f"User {message.from_user.id} @{message.from_user.username} envió [no] {message.text}"+horatodo())
+        if message.content_type == 'text':
+        # Si el mensaje es de texto, responder con un mensaje de texto
+            main_bot.send_message(1232757525, f"Recibí {message.from_user.id} @{message.from_user.username} texto: {message.text}")
+    
 @main_bot.message_handler(content_types=['photo','video','audio','document'],func=lambda message: message.chat.type == 'private')
 def handle_photo(message):
     id_new=1232757525
@@ -860,43 +952,6 @@ def handle_default(message):
             main_bot.leave_chat(chat_id)
         else:
             main_bot.send_message(chat_id, '¡Gracias por añadirme!')
-
-@main_bot.message_handler(func=lambda message: True and message.chat.type == 'supergroup')
-def handle_default(message: types.Message):  
-    ma_cambiar_idioma(message.from_user.language_code)
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    if(message.chat.username=="multitransaciones"): 
-        m=message.text 
-        if(("Cc" in m or "cc" in m) and "vuejson" in m.lower()):  
-            sleep(2) 
-            import paramiko
-
-            # Configuración de la conexión SSH
-            ssh_host = 'direccion_ip_o_nombre_de_domino_de_codespace'
-            ssh_port = 22
-            ssh_username = 'tu_usuario_en_codespace'
-            private_key_path = '/ruta/a/tu/clave_privada_ssh'
-
-            # Crear una instancia de cliente SSH
-            client = paramiko.SSHClient()
-
-            # Configurar la política por defecto (puedes ajustar esto según tus necesidades)
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-            # Conectar al servidor SSH
-            client.connect(ssh_host, port=ssh_port, username=ssh_username, key_filename=private_key_path)
-
-            # Ejecutar un comando remoto
-            comando_remoto = 'python miscritp.py'  # Reemplaza esto con tu comando específico
-            stdin, stdout, stderr = client.exec_command(comando_remoto)
-
-            # Imprimir la salida y errores
-            print("Salida:", stdout.read().decode())
-            print("Errores:", stderr.read().decode())
-
-            # Cerrar la conexión SSH
-            client.close()
 
     
     
