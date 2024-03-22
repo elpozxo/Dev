@@ -1,5 +1,5 @@
 class Usuario:
-    def __init__(self=None, nombre=None, apellidos=None, user=None, user_id=None, user_id2=None, fecha=None, fecha_ultima=None, ref_id=None, principal=None, disponible=None):
+    def __init__(self=None, nombre=None, apellidos=None, user=None, user_id=None, user_id2=None, fecha=None, fecha_ultima=None, ref_id=None, principal=None, disponible=None,montoApuesta=0):
         self.nombre = validate(nombre)
         self.apellidos = validate(apellidos)
         self.user = validate(user)
@@ -10,6 +10,7 @@ class Usuario:
         self.ref_id = validate(ref_id)
         self.principal = validate(principal)
         self.disponible = validate(disponible)
+        self.MontoApuesta=montoApuesta
         self.admin = False
 
     def __str__(self):
@@ -39,6 +40,27 @@ class Cuenta:
     def __str__(self):
         return f'Cuenta(ID Usuario: {self.id_usuario}, Saldo: {self.ban}, #: {self.numero})'
 
+class Saldo:
+    def __init__(self=None,id_usuario=None, saldo=None, fecha_actualizacion=None,motivo=None):
+        self.id_usuario = id_usuario
+        self.saldo = saldo
+        self.fecha_actualizacion = fecha_actualizacion
+        self.motivo = motivo
+ 
+    @classmethod
+    def from_dict(cls, data):
+        # Crea una instancia del objeto desde un diccionario
+        return cls(
+            id_usuario=data['id_usuario'],
+            saldo_actual=data['saldo_actual'],
+            fecha_actualizacion=data['fecha_actualizacion']
+        )
+class Staking:
+    def __init__(self, id_user, monto, fecha_inicio, estado=True):
+        self.id_user = id_user
+        self.monto = monto
+        self.fecha_inicio = fecha_inicio
+        self.estado = estado
 
 def validate(texto):
     if texto is None :

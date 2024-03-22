@@ -25,10 +25,10 @@ def Inicializar(id,hash):
     api_id=id
 
 
-def clickBotonera(client, channel_username, message_history, columna, fila):
+async def clickBotonera(client, channel_username, message_history, columna, fila):
     sleep(1)
     channel_id = message_history.messages[0].id
-    client(
+    await client(
         GetBotCallbackAnswerRequest(
             channel_username,
             channel_id,
@@ -58,14 +58,17 @@ def clickBotonera2(client, channel_username, message_history, columna, fila):
 async def MensajePlano(mensaje, bot, client):
     await client.send_message(entity=bot, message=mensaje)
 
-def MensajeResponder(mensaje,botOcanal,client,reply):
-    client.send_message(entity=botOcanal,message=mensaje, reply_to=reply)
+async def MensajePlanor(mensaje, bot, client):
+    return await client.send_message(entity=bot, message=mensaje)
+
+async def MensajeResponder(mensaje,botOcanal,client,reply):
+    await client.send_message(entity=botOcanal,message=mensaje, reply_to=reply)
 
 def MensajeFoto(mensaje, bot, client):
     client.send_file(entity=bot, file=mensaje)
 
-def UltimoMensaje(client, channel_entity):
-    return client(
+async def UltimoMensaje(client, channel_entity):
+    return await client(
         GetHistoryRequest(
             peer=channel_entity,
             limit=1,
@@ -92,10 +95,10 @@ def UltimoMensaje2(client, channel_entity):
         )
     )
 
-def mensaje2(mensaje, a, aa, b, bb):
+async def mensaje2(mensaje, a, aa, b, bb):
     return mensaje.messages[0].message.split(a)[aa].split(b)[bb]
 
-def mensaje(mensaje, a, aa):
+async def mensaje(mensaje, a, aa):
     return mensaje.messages[0].message.split(a)[aa]
 
 
@@ -104,33 +107,39 @@ async def Logear_a(phone_number):
         os.makedirs("session")
     client = TelegramClient("session/" + phone_number, api_id, api_hash)
     await client.connect()
+    w=-2
     if not await client.is_user_authorized():
         try:
             await client.send_code_request(phone_number)
         except Exception as inst:
             print(inst)
-            return -1
+            w= -1
     if not await client.is_user_authorized():
-        return 0
+        w= 0
     else:
-        return 1
+        w= 1
+    await client.disconnect()
+    return w
  
 async def Logear_ab(phone_number,clave):
     if not os.path.exists("session"):
         os.makedirs("session")
     client = TelegramClient("session/" + phone_number, api_id, api_hash)
     await client.connect()
+    w=-2
     if not await client.is_user_authorized():
         try:
             await client.send_code_request(phone_number)
             await client.sign_in(phone_number,clave)
         except Exception as inst:
             print(inst)
-            return -1
+            w= -1
     if not await client.is_user_authorized():
-        return 0
+        w= 0
     else:
-        return 1
+        w= 1
+    client.disconnect()
+    return w
  
 def CorreoFalso(cantidad):
     letters = ascii_lowercase
@@ -160,8 +169,8 @@ async def unirseCanal(client, canal):
     await client(JoinChannelRequest(canal))
 
 
-def unirsecanalPriv(client, canal):
-    client(functions.messages.ImportChatInviteRequest(hash=canal))
+async def unirsecanalPriv(client, canal):
+    await client(functions.messages.ImportChatInviteRequest(hash=canal))
 
 
 async def A_unirseCanal(client, canal):
@@ -870,8 +879,8 @@ def pasarSaldo(moneda):
                 sleep(2)
         except:
             f=1
-def buscarMensaje(client, channel_entity,ultimo=0):
-    return client(
+async def buscarMensaje(client, channel_entity,ultimo=0):
+    return await client(
         GetHistoryRequest(
             peer=channel_entity,
             limit=1,
@@ -1020,8 +1029,8 @@ def cambiarArroba(client,arroba):
                          username=arroba[:25]
                     ))
       
-def BotRefe(client,bot,ref):
-    client(
+async def BotRefe(client,bot,ref):
+    await client(
         functions.messages.StartBotRequest(
             bot=bot, peer=bot, start_param=ref
         )
@@ -1032,8 +1041,205 @@ def BotRefe(client,bot,ref):
 ################################################################3
 ################################################################3
 ################################################################3
-
+async def EjecutarTaarea(el_text,cuentas,principal,ini=0,fin=100000,por=0):
+    ##-1 no conexion cliente no autorizado
+    ##0 un error en lo que debe hacer
+    contador=0 
+    for cuenta in cuentas:
+        if ini==fin:
+            return 1,errores,contador
+        if contador>=por:
+            ini+=1 ##solo para saber en cuanta se ejecutara
+            phone_number = cuenta.get("numero") 
+        
+            client = TelegramClient("session/" + phone_number, api_id, api_hash)
+            await client.connect()
+            if not await client.is_user_authorized(): 
+                return -1,cuenta.get("numero"),contador
+            errores="_"
+            bot=""
+            ref=""
+            lista=[]
+            voylista=0
+            try:
+                for x in el_text:
+                    if x.startswith("Privunirser"):
+                        canales=x[12:].split(",")
+                        l=[]
+                        for canal in canales: 
+                            if canal[0]=="@":
+                                l.append(canal[2:])
+                            if canal[0]=="1":
+                                l.append(canal[1:])
+                            if canal.startswith("http"):
+                                l.append(canal.split("t.me/+")[1])
+                        
+                        for canal in l:
+                            try:
+                                await unirsecanalPriv(client, canal)
+                            except:
+                                errores+=f"{phone_number} no se pudo unir ap {canal}\n"
+                    if x.startswith("unirser"):
+                        canales=x[8:].split(",")
+                        l=[]
+                        for canal in canales: 
+                            if canal[0]=="@":
+                                l.append(canal[1:])
+                            if canal.startswith("http"):
+                                l.append(canal.split("t.me/")[1])
+                        for canal in l:
+                            try:
+                                await unirseCanal(client, canal)
+                            except:
+                                errores+=f"{phone_number} no se pudo unir a {canal}\n"
+                    if x.startswith("mensaje"):
+                        f="" 
+                        try:
+                            if x[8]=="@":
+                                patron = r'@(\w+)'
+                                coincidencias = re.findall(patron, x)  
+                                canal="@"+coincidencias[0] 
+                                mensaje=x.split(canal)[1] 
+                                await MensajePlano(mensaje, canal,client)
+                            else:
+                                await MensajePlano(x[7:],bot,client)
+                        except:
+                            errores+=f"{phone_number}no se puedo enviar mensaje\n"
+                    if x.startswith("ini"):
+                        try:
+                            ini=int(x[4:])
+                        except:
+                            errores+=f"El inicio no fue cambiado {x[4:]}\n"
+                    if x.startswith("fin"):
+                        try:
+                            fin=int(x[4:])
+                        except:
+                            errores+=f"El fin no fue cambiado {x[4:]}\n"
+                    if x.startswith("por"):
+                        try:
+                            por=int(x[4:])
+                        except:
+                            errores+=f"El por no fue cambiado {x[4:]}\n"
+                    if x.startswith("desbloquiar"):
+                        canales=x[12:].split(",")
+                        l=[]
+                        for canal in canales: 
+                            if canal[0]=="@":
+                                l.append(canal[1:])
+                            if canal.startswith("http"):
+                                l.append(canal.split("t.me/")[1])
+                        for canal in l:
+                            try:
+                                await desbloquiar(client, canal)
+                            except:
+                                errores+=f"{phone_number} no se pudo desbloquiar a {canal}\n"
+                    if x.startswith("botRef"):
+                        link=x.split("?")
+                        bot=link[0].split("t.me/")[1]
+                        ref=link[1].split("=")[1]
+                    if x.startswith("ibot"):
+                        await BotRefe(client,bot,ref)
+                    if x.startswith("sbot"): 
+                        bot=x[5:]
+                    if x.startswith("Ref"): 
+                        ref=x[4:]
+                    if x.startswith("envia"): 
+                        cual=x.split(" ")
+                        if(len(cual)==1):
+                            mensaje=await UltimoMensaje(client,bot)
+                            mensaje=mensaje.messages[0].message
+                        else:
+                            try:
+                                cual=int(cual[1])
+                            except:
+                                errores+=f"al #enviar debe ser un numero\n"
+                                cual=0
+                            id_mns=await UltimoMensaje(client,bot)
+                            id_mns=id_mns.messages[0].id
+                            mensaje=await buscarMensaje(client,bot,id_mns-cual)
+                            mensaje=mensaje.messages[0].message
+                        await MensajePlano(mensaje,bot,client)
+                    if x.startswith("renvia"): 
+                        cual=x.split(" ")
+                        if(len(cual)==1):
+                            mensaje=await UltimoMensaje(client,bot) 
+                            mensaje=mensaje.messages[0].message
+                        else:
+                            try:
+                                cual=int(cual[1])
+                            except:
+                                errores+=f"al #enviar debe ser un numero\n"
+                                cual=0
+                            id_mns=await UltimoMensaje(client,bot)
+                            id_mns=id_mns.messages[0].id
+                            mensaje=await buscarMensaje(client,bot,id_mns-cual)                        
+                            mensaje=mensaje.messages[0].message
+                        await MensajePlano(mensaje,principal.grupo,client)
+                    if x.startswith("esperar"): 
+                        cual=x.split(" ")
+                        if(len(cual)==1):
+                            errores+=f"al #esperar debe ser un numero\n"
+                            sleep(2)
+                        else:
+                            try:
+                                v=int(cual[1])
+                            except:
+                                errores+=f"al #esperar debe ser un numero\n"
+                                v=2
+                            sleep(v)
+                    if x.startswith("click"): 
+                        cual=x.split(" ")  
+                        if((cual[1])==""): 
+                            try:
+                                await clickBotonera(client,bot,await UltimoMensaje(client,bot),0,0)
+                            except:
+                                f=1
+                        else:
+                            try:
+                                v= cual[1].split(",")
+                                await clickBotonera(client,bot,await UltimoMensaje(client,bot),v[0],v[1])
+                            except:
+                                errores+=f"al #click debe ser pasarle 0,0\npara darle click a la coluna 0 fila 0"
+                                v=2
+                            sleep(v)
+                    if x.startswith("operar"): 
+                        cual=x[9:].split(",")  
+                        if(len(cual)==2):
+                            ult=await UltimoMensaje(client,bot)
+                            ult=ult.messages[0].message 
+                            try:
+                                ult=ult.split(cual[0])[1].split(cual[1])[0]
+                            except:
+                                errores+="No se pudo encontrar los separadores\n"
+                                next                    
+                            resultado = eval(ult) 
+                            await MensajePlano(f"{resultado}",bot,client)
+                    if x.startswith("lista"): 
+                        lista=x[6:].split(",")  
+                    if x.startswith("orden"): 
+                        await MensajePlano(lista[voylista],bot,client)
+                        voylista+=1
+                        if(len(list)==voylista):
+                            errores+="alcanze el max de la lista\n"
+                            voylista=0
+                    if x.startswith("desorden"): 
+                        await MensajePlano(lista[rando(0,len(list))],bot,client)
+                        voylista+=1
+                        if(len(list)==voylista):
+                            errores+="alcanze el max de la lista\n"
+                            voylista=0
+                        
+            except:
+                f=1
+            await client.disconnect()
+        contador+=1
+    return 0,errores,contador
+    
 async def validarcuenta(phone_number,canales): 
+    ##-1 cuenta sin activar
+    ##1 no canales??
+    ##2 no escribir
+    ##0 ok
     colorama.init(autoreset=True)
     Cverde = Style.RESET_ALL + Style.BRIGHT + Fore.GREEN
     Camarillo = Style.RESET_ALL + Style.BRIGHT + Fore.YELLOW
@@ -1043,7 +1249,7 @@ async def validarcuenta(phone_number,canales):
     client = TelegramClient("session/" + phone_number, api_id, api_hash)
     await client.connect()
     if not await client.is_user_authorized():        
-        print(Crojo +f"\n\nNo tengo autorizacion {phone_number}")
+        print(Crojo +f"No tengo autorizacion {phone_number}")
         return "No tengo autorizacion",-1
     else:
         tiempo = datetime.now()  
@@ -1067,12 +1273,62 @@ async def validarcuenta(phone_number,canales):
         ok=2
         print(Crojo+"Error")
     tiempo = datetime.now()
-    print(Camarillo + str(tiempo.time()))
-    max = 1
-    while client.is_connected():
-        max = max + 1
-        if max == 3:
-            break
-        client.disconnect()
-        sleep(2) 
+    print(Camarillo + str(tiempo.time())) 
+    await client.disconnect() 
     return "Tengo acceso",ok
+
+async def saldoAdmin():    
+    api_id='20352615'
+    api_hash='5043a027b59d899b67e02a14b98de4b3'    
+    async with TelegramClient("./session/+573102820183", api_id,api_hash, lang_code="es") as client:
+        await client.connect()        
+        if not await client.is_user_authorized():
+            return -1         
+        bot = "@cctip_bot"  
+        await MensajePlano("balance trx", bot, client) 
+        await asyncio.sleep(2)        
+        x = await UltimoMensaje(client, bot)
+        x = await mensaje2(x, "TRX: ", 1, "\n", 0)
+        await client.disconnect()             
+    return Decimal(x)
+
+async def pagara(monto,user):    
+    api_id='20352615'
+    api_hash='5043a027b59d899b67e02a14b98de4b3' 
+    client = TelegramClient("./session/+573102820183" , api_id, api_hash, lang_code="es")
+    await client.connect()
+    if not await client.is_user_authorized():         
+        return  -1   
+    a=await UltimoMensaje(client,"@multitransaciones")
+    a=a.messages[0].id
+    y=await MensajePlanor(f"cc {(monto*0.00095):.3f} trx @{user}","@multitransaciones",client) 
+    await MensajePlanor(f"/balance@cctip_bot","@multitransaciones",client) 
+    await client.disconnect() 
+    return y
+
+async def buscarRecarga(id):    
+    api_id='20352615'
+    api_hash='5043a027b59d899b67e02a14b98de4b3'  
+    client = TelegramClient("./session/+573102820183" , api_id, api_hash, lang_code="es")
+    await client.connect()
+    if not await client.is_user_authorized():         
+        return  -1   
+    a = await UltimoMensaje(client, "@multitransaciones")
+    ultimo = a.messages[0].id
+    while id != ultimo+1:
+        m = await buscarMensaje(client, "@multitransaciones",ultimo-id)  # El signo negativo es para obtener mensajes anteriores
+        try:
+            k = m.messages[0].message.lower()
+            if "trx" in k and "vuejson" in k:
+                valor=k.split("trx")[1].split("vuejson")[0]
+                d=k.split(" tip")[0]
+                v=Decimal(valor)
+                await MensajePlano(f"+pasar {v*1000:.0f} @{d}","@multitransaciones",client)
+                await MensajePlanor(f"/balance@cctip_bot","@multitransaciones",client) 
+        except Exception as s:
+            f=1
+        id += 1  # Incrementa el ID para obtener el siguiente mensaje
+    await client.disconnect()
+    
+    
+      

@@ -1,0 +1,8 @@
+# Ignorar la carpeta 'session'
+
+__pycache__/*
+modelo/__pycache__/*
+node_modules/*
+
+# Ignorar archivos con extensión '.txt'
+*.txt
