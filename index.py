@@ -398,7 +398,7 @@ def handle_start(message: types.Message):
     us = Usuario(
         nombre=user_info.first_name,
         apellidos=user_info.last_name,
-        user=user_info.username.lower(),
+        user=user_info.username.lower() if user_info.username is not None else None,
         user_id=user_info.id,
         user_id2=None,
         fecha=f"{get_fecha()} {get_hora()}",  # Combina fecha y hora
@@ -1251,7 +1251,8 @@ def handle_Info(message: types.Message):
         if user==None:
             user=message.from_user.first_name
         verSaldo(id_user,id_chat,user,message.message_id,True)
-                 
+
+                
 @main_bot.message_handler(func=lambda message: message.text==ma_botones("apartado") and message.chat.type == 'private')
 def handle_Info(message: types.Message):    
     ma_cambiar_idioma(message.from_user.language_code)
@@ -1561,5 +1562,5 @@ def nomain():
     main_bot.delete_webhook()
     main_bot.polling(timeout=10)
 if __name__ == '__main__':
-    main()
-    # nomain()
+    # main()
+    nomain()

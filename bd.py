@@ -202,8 +202,13 @@ def obtener_saldos_id_agrupados(id):
     for doc in documentos_saldo:
         # Obtener datos del documento Saldo
         datos_saldo = doc.to_dict()  
-        monto = int(datos_saldo.get('saldo', 0))
-        motivo = (datos_saldo.get('motivo', "??"))
+        x=int(datos_saldo.get('saldo', 0))
+        if(x>0):
+            monto = x
+            motivo = "+"+(datos_saldo.get('motivo', "??"))
+        else:
+            monto = x
+            motivo = "-"+(datos_saldo.get('motivo', "??"))
         # Sumar el monto al total para el id de usuario correspondiente
         sumas_por_id[motivo] = sumas_por_id.get(motivo, 0) + monto
     return sumas_por_id
